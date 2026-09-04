@@ -25,6 +25,13 @@ const ARCHIVOS_PY = [
   "mticore/context.py",
   "mticore/version.py",
   "mticore/portable.py",
+  // Capítulos 5 y 6. `ai_summaries` es un sustituto inerte: el módulo original
+  // llama a una API externa y no viaja en esta app.
+  "mticore/hierarchy.py",
+  "mticore/operations.py",
+  "mticore/operational_topology.py",
+  "mticore/persistent_homology.py",
+  "mticore/ai_summaries.py",
 ];
 
 let pyodide = null;
@@ -127,6 +134,71 @@ const acciones = {
     await asegurarCorpus();
     return JSON.parse(
       puente.rank_corpus(JSON.stringify(familia), JSON.stringify(parametros))
+    );
+  },
+
+  async opFixtures() {
+    await asegurarMotor();
+    return JSON.parse(puente.operations_fixtures());
+  },
+
+  async opTrayectoria({ origen, destino, acciones, parametros }) {
+    await asegurarMotor();
+    return JSON.parse(puente.operations_trajectory(
+      JSON.stringify(origen), JSON.stringify(destino),
+      JSON.stringify(acciones || []), JSON.stringify(parametros)));
+  },
+
+  async opAlcance({ origen, destino, parametros }) {
+    await asegurarMotor();
+    return JSON.parse(puente.operations_reachability(
+      JSON.stringify(origen), JSON.stringify(destino), JSON.stringify(parametros)));
+  },
+
+  async opBusqueda({ origen, destino, parametros, envolvente }) {
+    await asegurarMotor();
+    return JSON.parse(puente.operations_search(
+      JSON.stringify(origen), JSON.stringify(destino),
+      JSON.stringify(parametros), JSON.stringify(envolvente || {})));
+  },
+
+  async opTopologia({ parametros }) {
+    await asegurarMotor();
+    return JSON.parse(puente.operations_topology(JSON.stringify(parametros)));
+  },
+
+  async opInforme() {
+    await asegurarMotor();
+    return JSON.parse(puente.operations_report());
+  },
+
+  async jerarquiaFixtures() {
+    await asegurarMotor();
+    return JSON.parse(puente.hierarchy_fixtures());
+  },
+
+  async jerarquiaDesdeFamilia({ familia }) {
+    await asegurarMotor();
+    return JSON.parse(puente.configuration_from_family(JSON.stringify(familia)));
+  },
+
+  async jerarquiaConstituir({ configuracion }) {
+    await asegurarMotor();
+    return JSON.parse(puente.hierarchy_constitute(JSON.stringify(configuracion)));
+  },
+
+  async jerarquiaPreimagen({ motivo }) {
+    await asegurarMotor();
+    return JSON.parse(puente.hierarchy_preimage(JSON.stringify(motivo)));
+  },
+
+  async jerarquiaElevacion({ configuracion, operador, descriptor, delta }) {
+    await asegurarMotor();
+    return JSON.parse(
+      puente.hierarchy_lift(
+        JSON.stringify(configuracion), operador,
+        JSON.stringify(descriptor), JSON.stringify(delta ?? null)
+      )
     );
   },
 

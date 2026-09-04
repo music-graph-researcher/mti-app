@@ -34,7 +34,10 @@
   <button type="button" class="paso" data-panel="p-resultado" disabled><b>4</b> Análisis</button>
   <button type="button" class="paso" data-panel="p-biblioteca"><b>5</b> Biblioteca</button>
   <button type="button" class="paso" data-panel="p-corpus"><b>6</b> Corpus</button>
-  <button type="button" class="paso" data-panel="p-validacion"><b>7</b> Validación</button>
+  <button type="button" class="paso" data-panel="p-extendido"><b>7</b> Extendido</button>
+  <button type="button" class="paso" data-panel="p-operacional"><b>8</b> Operacional</button>
+  <button type="button" class="paso" data-panel="p-jerarquia"><b>9</b> Jerarquía</button>
+  <button type="button" class="paso" data-panel="p-validacion"><b>10</b> Validación</button>
 </nav>
 
 <main>
@@ -212,7 +215,144 @@
   <div class="lista" id="corpus-obras"></div>
 </section>
 
-<!-- ═══════════ 7 · VALIDACIÓN ═══════════ -->
+<!-- ═══════════ 7 · CORPUS EXTENDIDO ═══════════ -->
+<section id="p-extendido" class="panel">
+  <h1>Corpus extendido</h1>
+  <p class="intro">
+    Las lecturas comparativas del §3.6 sobre el mismo corpus: estructural,
+    rítmica y las contextuales por componente. Cada una con su propia matriz de
+    disimilitud, su clustering, su silueta, su homología persistente y su
+    medoide.
+  </p>
+
+  <div class="aviso suave">
+    <b>Lecturas separadas, nunca agregadas</b>
+    Cada componente se lee por su cuenta. No se combinan entre sí ni con
+    <span class="mono">Dγ</span> en ningún escalar único.
+  </div>
+
+  <div class="filtros" id="ext-texturas"></div>
+  <div id="ext-lecturas"></div>
+</section>
+
+<!-- ═══════════ 8 · OPERACIONAL ═══════════ -->
+<section id="p-operacional" class="panel">
+  <h1>Topología operacional</h1>
+  <p class="intro">
+    Capítulo 5: acciones sobre estados motívicos, trayectorias, el multigrafo
+    finito <span class="mono">G_R</span> y la comparación entre la topología
+    estructural y la operacional.
+  </p>
+
+  <h2>Origen X</h2>
+  <div class="filtros" id="op-origen"></div>
+  <h2>Destino Y</h2>
+  <div class="filtros" id="op-destino"></div>
+  <div class="resumen-sel" id="op-estados"></div>
+
+  <h2>Trayectoria y alcanzabilidad</h2>
+  <p class="nota">
+    El testigo constructivo demuestra que <span class="mono">Y</span> es
+    alcanzable. Su coste es una cota superior, no el ínfimo teórico
+    <span class="mono">δ_T</span>.
+  </p>
+  <div class="acciones-rollo">
+    <button type="button" id="op-trayectoria" class="sec">Evaluar trayectoria</button>
+    <button type="button" id="op-alcance" class="sec">Testigo de alcance</button>
+  </div>
+  <div id="op-alcance-res"></div>
+
+  <h2>Búsqueda restringida sobre G_R</h2>
+  <p class="nota">
+    La envolvente acota la exploración. Ampliarla da grafos mayores y tarda más;
+    en un móvil conviene no pasarse.
+  </p>
+  <div class="rejilla-pesos">
+    <label>Pasos<input type="number" id="op-pasos" value="4" min="1" max="8"></label>
+    <label>Nodos<input type="number" id="op-nodos" value="400" min="20" max="2000" step="20"></label>
+    <label>Caminos<input type="number" id="op-caminos" value="64" min="8" max="256" step="8"></label>
+    <label>γ<input type="number" id="op-gamma" value="5" min="1" max="12"></label>
+  </div>
+  <button type="button" id="op-buscar" class="principal">Materializar G_R</button>
+  <div id="op-buscar-res"></div>
+
+  <h2>Comparación topológica</h2>
+  <p class="nota">Estructural frente a operacional sobre el mismo subgrafo finito.</p>
+  <button type="button" id="op-topologia" class="sec" disabled>Comparar topologías</button>
+  <button type="button" id="op-exportar" class="sec" disabled>Descargar informe</button>
+  <div id="op-topologia-res"></div>
+
+  <div class="aviso suave">
+    <b>Sin resúmenes con IA</b>
+    El módulo del proyecto que los genera llama a un servicio externo. En esta
+    app se sustituye por uno inerte: el cálculo del capítulo 5 es idéntico y
+    nada sale del dispositivo.
+  </div>
+</section>
+
+<!-- ═══════════ 9 · JERARQUÍA ═══════════ -->
+<section id="p-jerarquia" class="panel">
+  <h1>Jerarquía constitutiva</h1>
+  <p class="intro">
+    Marco tipado del capítulo 6. La transición evento → motivo
+    <span class="mono">A₀→₁</span> está especificada; las superiores no.
+  </p>
+
+  <h2>Fundación 0 → 1</h2>
+  <p class="nota">
+    Constructor de preimagen, no trivialidad, no reducibilidad y compatibilidad
+    transformacional con las operaciones del capítulo 5.
+  </p>
+  <button type="button" id="jer-fixtures" class="principal">Ejecutar las comprobaciones fundacionales</button>
+  <div id="jer-fixtures-res"></div>
+
+  <h2>Material de trabajo</h2>
+  <p class="nota">
+    De dónde sale la configuración basal <span class="mono">Ξ₀</span> con la que
+    operan los tres bloques siguientes.
+  </p>
+  <div class="filtros" id="jer-fuentes"></div>
+  <div class="resumen-sel" id="jer-material"></div>
+
+  <h2>Constitución A₀→₁</h2>
+  <p class="nota">Configuración basal → estado motívico normalizado, con su testigo de procedencia.</p>
+  <button type="button" id="jer-constituir" class="sec">Constituir</button>
+  <div id="jer-constituir-res"></div>
+
+  <h2>Constructor de preimagen</h2>
+  <p class="nota">Dado <span class="mono">X</span>, construye <span class="mono">Ξ_X</span> tal que <span class="mono">A₀→₁(Ξ_X) = X</span>.</p>
+  <button type="button" id="jer-preimagen" class="sec">Construir preimagen</button>
+  <div id="jer-preimagen-res"></div>
+
+  <h2>Compatibilidad transformacional</h2>
+  <p class="nota">Eleva un operador motívico del capítulo 5 y comprueba que el diagrama conmuta.</p>
+  <div class="rejilla-pesos">
+    <label>Operador
+      <select id="jer-operador">
+        <option value="pitch">altura (Δh)</option>
+        <option value="onset">ataque (Δu)</option>
+        <option value="offset">terminación (Δv)</option>
+        <option value="insert">inserción</option>
+        <option value="delete">eliminación</option>
+        <option value="identity">identidad</option>
+      </select>
+    </label>
+    <label>Δ<input type="text" id="jer-delta" value="1"></label>
+  </div>
+  <label class="jer-descriptor">Descriptor
+    <select id="jer-descriptor"></select>
+  </label>
+  <button type="button" id="jer-elevacion" class="sec">Verificar conmutatividad</button>
+  <div id="jer-elevacion-res"></div>
+
+  <div class="aviso suave">
+    <b>La jerarquía <span class="mono">r</span> no es escala temporal</b>
+    <span class="mono">A₀→₁</span> no implica <span class="mono">A₁→₂</span>. La
+    procedencia de cada constitución permanece recuperable.
+  </div>
+</section>
+
+<!-- ═══════════ 9 · VALIDACIÓN ═══════════ -->
 <section id="p-validacion" class="panel">
   <h1>Validación empírica E3–E6</h1>
   <p class="intro">

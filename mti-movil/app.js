@@ -158,6 +158,9 @@ $$(".paso").forEach((boton) => {
     if (boton.dataset.panel === "p-biblioteca") pintarBiblioteca();
     if (boton.dataset.panel === "p-corpus") pintarCorpus();
     if (boton.dataset.panel === "p-validacion") pintarValidacion();
+    if (boton.dataset.panel === "p-extendido") pintarExtendido();
+    if (boton.dataset.panel === "p-jerarquia") pintarJerarquia();
+    if (boton.dataset.panel === "p-operacional") pintarOperacional();
     irA(boton.dataset.panel);
   });
 });
@@ -1154,6 +1157,468 @@ function pintarContextual(datos) {
     <div class="proc">
       ${filas.map(([etiqueta, , valor]) => `<div><span>${etiqueta}</span><span>${valor}</span></div>`).join("")}
     </div>`;
+}
+
+/* ══════════════════ Topología operacional ══════════════════ */
+
+// Los dos estados del capítulo 5 salen de la biblioteca o del par canónico.
+const PAR_CANONICO = {
+  X: { events: [[0, "0", "1/4"], [2, "1/4", "1/2"], [4, "1/2", "1"]] },
+  Y: { events: [[0, "0", "1/4"], [3, "1/4", "1/2"], [5, "1/2", "1"]] },
+};
+
+const operacional = { origen: "canonico", destino: "canonico", X: null, Y: null, hayGrafo: false };
+
+async function motivoDeFuente(id, cual) {
+  if (id === "canonico") return PAR_CANONICO[cual];
+  const guardado = leerBiblioteca().find((m) => m.id === id);
+  if (!guardado) return null;
+  const datos = await motor("jerarquiaDesdeFamilia", { familia: guardado.familia });
+  return datos.ok ? datos.motif : null;
+}
+
+function parametrosOperacionales() {
+  return {
+    omega_pc: 1, omega_lin: 1, omega_on: 1, omega_off: 1,
+    gamma: Number($("#op-gamma").value) || 5,
+  };
+}
+
+async function pintarOperacional() {
+  const guardados = leerBiblioteca();
+  const opciones = [{ id: "canonico", nombre: "Par canónico" }]
+    .concat(guardados.map((m) => ({ id: m.id, nombre: `${m.nombre} · ${m.eventos} ev.` })));
+
+  const pintarFila = (selector, clave) => {
+    $(selector).innerHTML = opciones.map((o) =>
+      `<button type="button" class="filtro" data-id="${o.id}" aria-pressed="${o.id === operacional[clave]}">${o.nombre}</button>`
+    ).join("");
+    $$(`${selector} .filtro`).forEach((boton) => {
+      boton.addEventListener("click", async () => {
+        operacional[clave] = boton.dataset.id;
+        await pintarOperacional();
+      });
+    });
+  };
+  pintarFila("#op-origen", "origen");
+  pintarFila("#op-destino", "destino");
+
+  operacional.X = await motivoDeFuente(operacional.origen, "X");
+  operacional.Y = await motivoDeFuente(operacional.destino, "Y");
+
+  const iguales = JSON.stringify(operacional.X) === JSON.stringify(operacional.Y);
+  $("#op-estados").innerHTML = !operacional.X || !operacional.Y
+    ? "<b>Faltan estados.</b> Elige un origen y un destino."
+    : `X con <b>${operacional.X.events.length}</b> evento(s) · Y con <b>${operacional.Y.events.length}</b>` +
+      (iguales ? " · <i>son idénticos: G_R no puede materializarse</i>" : "");
+
+  $("#op-buscar").disabled = !operacional.X || !operacional.Y || iguales;
+  $("#op-topologia").disabled = !operacional.hayGrafo;
+  $("#op-exportar").disabled = !operacional.hayGrafo;
+}
+
+$("#op-trayectoria").addEventListener("click", async () => {
+  const caja = $("#op-alcance-res");
+  caja.innerHTML = `<p class="nota">Evaluando…</p>`;
+  try {
+    const d = await motor("opTrayectoria", {
+      origen: operacional.X, destino: operacional.Y, acciones: [],
+      parametros: parametrosOperacionales(),
+    });
+    if (!d.ok) { caja.innerHTML = `<div class="aviso"><b>Error</b>${d.error}</div>`; return; }
+    const c = d.comparacion || {};
+    caja.innerHTML = `
+      <div class="proc">
+        <div><span>Coste C_op(π)</span><span>${d.coste.exact}</span></div>
+        <div><span>Longitud</span><span>${d.pasos}</span></div>
+        <div><span>Alcanza Y</span><span>${chapa(d.alcanza ? "SÍ" : "NO")}</span></div>
+        ${c.D_gamma ? `<div><span>Dγ(X,Y)</span><span>${c.D_gamma.exact}</span></div>` : ""}
+        ${c.D_gamma_le_trajectory !== undefined && c.D_gamma_le_trajectory !== null
+          ? `<div><span>§5.9.1 · Dγ ≤ C_op(π)</span><span>${chapa(c.D_gamma_le_trajectory ? "PASS" : "FAIL")}</span></div>` : ""}
+      </div>
+      <p class="nota">Secuencia: ${(d.secuencia || []).join(" → ") || "ε (trayectoria vacía)"}</p>`;
+  } catch (error) {
+    caja.innerHTML = `<div class="aviso"><b>Error del motor</b>${error.message}</div>`;
+  }
+});
+
+$("#op-alcance").addEventListener("click", async () => {
+  const caja = $("#op-alcance-res");
+  caja.innerHTML = `<p class="nota">Construyendo el testigo…</p>`;
+  try {
+    const d = await motor("opAlcance", {
+      origen: operacional.X, destino: operacional.Y, parametros: parametrosOperacionales(),
+    });
+    if (!d.ok) { caja.innerHTML = `<div class="aviso"><b>Error</b>${d.error}</div>`; return; }
+    caja.innerHTML = `
+      <div class="proc">
+        <div><span>Alcanza Y</span><span>${chapa(d.alcanza ? "TESTIGO_OK" : "SIN_TESTIGO")}</span></div>
+        <div><span>Coste del testigo</span><span>${d.coste.exact}</span></div>
+        <div><span>Dγ estática</span><span>${d.distancia_estatica ? d.distancia_estatica.exact : "—"}</span></div>
+        <div><span>Pasos</span><span>${d.pasos} / ${d.cota}</span></div>
+        <div><span>Dentro de la cota</span><span>${chapa(d.dentro_de_cota ? "SÍ" : "NO")}</span></div>
+      </div>
+      <p class="nota">${d.declaracion || ""}</p>
+      ${d.muestra_pasos.length ? `<details class="atajos"><summary>Primeros pasos del testigo</summary>
+        <div class="tabla-caja"><table><tbody>${d.muestra_pasos.map((p, i) =>
+          `<tr><td>${i + 1}</td><td style="white-space:normal" class="mono">${p.accion || "—"}</td><td>${p.coste ? p.coste.exact : "—"}</td><td>${p.renormaliza ? "renorm." : ""}</td></tr>`).join("")}
+        </tbody></table></div>
+        ${d.pasos_omitidos ? `<p class="nota">y ${d.pasos_omitidos} paso(s) más.</p>` : ""}</details>` : ""}`;
+  } catch (error) {
+    caja.innerHTML = `<div class="aviso"><b>Error del motor</b>${error.message}</div>`;
+  }
+});
+
+$("#op-buscar").addEventListener("click", async () => {
+  const caja = $("#op-buscar-res");
+  caja.innerHTML = `<p class="nota">Materializando G_R… puede tardar unos segundos.</p>`;
+  $("#op-buscar").disabled = true;
+  try {
+    const d = await motor("opBusqueda", {
+      origen: operacional.X, destino: operacional.Y,
+      parametros: parametrosOperacionales(),
+      envolvente: {
+        max_steps: Number($("#op-pasos").value) || 4,
+        max_nodes: Number($("#op-nodos").value) || 400,
+        max_paths: Number($("#op-caminos").value) || 64,
+      },
+    });
+    if (!d.ok) { caja.innerHTML = `<div class="aviso"><b>Error</b>${d.error}</div>`; return; }
+    operacional.hayGrafo = true;
+    $("#op-topologia").disabled = false;
+    caja.innerHTML = `
+      <div class="cifras">
+        <div class="cifra"><b>${d.nodos}</b><span>nodos</span></div>
+        <div class="cifra"><b>${d.aristas}</b><span>aristas</span></div>
+        <div class="cifra"><b>${((d.ms || 0) / 1000).toFixed(1)} s</b><span>búsqueda</span></div>
+      </div>
+      <div class="estado-linea">${chapa(d.estado)}${d.truncado_por ? ` truncado por ${d.truncado_por}` : ""}</div>
+      <div class="proc" style="margin-top:10px">
+        <div><span>Mejor coste</span><span>${d.mejor_coste ? d.mejor_coste.exact : "—"}</span></div>
+        <div><span>Exacto en la restricción</span><span>${chapa(String(d.exacto_en_restriccion))}</span></div>
+        <div><span>Caminos óptimos</span><span>${d.procesos.caminos_optimos}</span></div>
+        <div><span>Diamantes conmutativos</span><span>${d.procesos.diamantes}</span></div>
+        <div><span>Ramificación / reconvergencia</span><span>${d.procesos.ramificacion} / ${d.procesos.reconvergencia}</span></div>
+      </div>
+      <p class="nota">${d.declaracion || ""}</p>`;
+  } catch (error) {
+    caja.innerHTML = `<div class="aviso"><b>Error del motor</b>${error.message}</div>`;
+  } finally {
+    $("#op-buscar").disabled = false;
+  }
+});
+
+$("#op-topologia").addEventListener("click", async () => {
+  const caja = $("#op-topologia-res");
+  caja.innerHTML = `<p class="nota">Comparando topologías…</p>`;
+  try {
+    const d = await motor("opTopologia", { parametros: parametrosOperacionales() });
+    if (!d.ok) { caja.innerHTML = `<div class="aviso"><b>Error</b>${d.error}</div>`; return; }
+    const r = d.resumen || {};
+    const ph = r.persistent_homology || {};
+    $("#op-exportar").disabled = false;
+    caja.innerHTML = `
+      <div class="estado-linea">${chapa(d.estado)}</div>
+      <div class="proc" style="margin-top:10px">
+        <div><span>Nodos / aristas de G_R</span><span>${r.graph_node_count} / ${r.graph_edge_count}</span></div>
+        <div><span>|C| · |C_R*|</span><span>${r.C_cardinality} · ${r.C_R_star_cardinality}</span></div>
+        <div><span>Pares operacionales finitos</span><span>${chapa(String(r.all_operational_pairs_finite))}</span></div>
+        <div><span>D_op es métrica</span><span>${chapa(String(r.metric_D_op))}</span></div>
+        <div><span>La operacional distingue</span><span>${chapa(String(r.operational_topology_distinguishes))}</span></div>
+        <div><span>H0 coincide</span><span>${chapa(String(ph.H0_agrees))}</span></div>
+        <div><span>H1 coincide</span><span>${chapa(String(ph.H1_agrees))}</span></div>
+        <div><span>Registros de trazabilidad</span><span>${r.traceability_record_count}</span></div>
+      </div>
+      <p class="nota">
+        Que las firmas de homología persistente no coincidan no invalida nada:
+        significa que la lectura operacional y la estructural ven cosas distintas
+        sobre el mismo subgrafo finito, que es justamente lo que el capítulo
+        pregunta.
+      </p>`;
+  } catch (error) {
+    caja.innerHTML = `<div class="aviso"><b>Error del motor</b>${error.message}</div>`;
+  }
+});
+
+$("#op-exportar").addEventListener("click", async () => {
+  try {
+    const d = await motor("opInforme", {});
+    if (!d.ok) { brindis(d.error); return; }
+    descargar(JSON.stringify(d.report, null, 2), "application/json",
+      `cap5-topologia-${new Date().toISOString().slice(0, 10)}.json`);
+  } catch (error) {
+    brindis(error.message);
+  }
+});
+
+/* ══════════════════ Jerarquía constitutiva ══════════════════ */
+
+// El motor devuelve estados en mayúsculas; se colorean por familia de resultado
+// en vez de enumerarlos, porque la lista crece con el capítulo.
+function chapa(estado) {
+  const texto = String(estado ?? "—");
+  let clase = "neutra";
+  if (/PASS|VALID|CONSTITUTED|EXTRACTED|SELECTED|VERIFIED/.test(texto)) clase = "ok";
+  else if (/FAIL|MISMATCH|ERROR|INSUFFICIENT|OUT_OF_DOMAIN/.test(texto)) clase = "mal";
+  else if (/NOT_TESTABLE|NOT_SPECIFIED|not_asserted|SKIPPED|DISABLED/.test(texto)) clase = "tibia";
+  return `<span class="chapa ${clase}">${texto}</span>`;
+}
+
+const jerarquia = { fuente: "ejemplo", configuracion: null, motivo: null, etiqueta: "" };
+
+const CONFIG_EJEMPLO_JER = {
+  level: 0,
+  occurrences: [
+    { id: "e1", state: { pitch: 0, onset: "0", duration: "1/4", articulation: "alpha0" } },
+    { id: "e2", state: { pitch: 2, onset: "1/4", duration: "1/8", articulation: "alpha0" } },
+    { id: "e3", state: { pitch: 4, onset: "1/2", duration: "1/4", articulation: "alpha0" } },
+    { id: "e4", state: { pitch: 7, onset: "3/4", duration: "1/4", articulation: "alpha0" } },
+  ],
+  relations: { type: "B(M)" },
+  auxiliary_data: { p_ton: 0 },
+};
+const MOTIVO_EJEMPLO_JER = { events: [[0, "0", "1/4"], [2, "1/4", "3/8"], [4, "1/2", "3/4"], [7, "3/4", "1"]] };
+
+async function pintarJerarquia() {
+  const guardados = leerBiblioteca();
+  const fuentes = [{ id: "ejemplo", nombre: "Ejemplo del capítulo" }]
+    .concat(guardados.map((m) => ({ id: m.id, nombre: `${m.nombre} · ${m.eventos} ev.` })));
+
+  $("#jer-fuentes").innerHTML = fuentes.map((f) =>
+    `<button type="button" class="filtro" data-fuente="${f.id}" aria-pressed="${f.id === jerarquia.fuente}">${f.nombre}</button>`
+  ).join("");
+  $$("#jer-fuentes .filtro").forEach((boton) => {
+    boton.addEventListener("click", () => { jerarquia.fuente = boton.dataset.fuente; pintarJerarquia(); });
+  });
+
+  if (jerarquia.fuente === "ejemplo") {
+    jerarquia.configuracion = CONFIG_EJEMPLO_JER;
+    jerarquia.motivo = MOTIVO_EJEMPLO_JER;
+    jerarquia.etiqueta = "Ejemplo del capítulo 6";
+  } else {
+    const motivo = guardados.find((m) => m.id === jerarquia.fuente);
+    if (!motivo) { jerarquia.fuente = "ejemplo"; return pintarJerarquia(); }
+    $("#jer-material").textContent = "Construyendo la configuración basal…";
+    try {
+      const datos = await motor("jerarquiaDesdeFamilia", { familia: motivo.familia });
+      if (!datos.ok) { $("#jer-material").innerHTML = `<b>No se pudo construir:</b> ${datos.error}`; return; }
+      jerarquia.configuracion = datos.configuration;
+      jerarquia.motivo = datos.motif;
+      jerarquia.etiqueta = motivo.nombre;
+    } catch (error) {
+      $("#jer-material").innerHTML = `<b>Error:</b> ${error.message}`;
+      return;
+    }
+  }
+
+  const ocurrencias = jerarquia.configuracion.occurrences;
+  $("#jer-material").innerHTML =
+    `<b>${jerarquia.etiqueta}</b> · ${ocurrencias.length} ocurrencia(s) basales · ` +
+    `p_ton ${jerarquia.configuracion.auxiliary_data.p_ton} · relación ${jerarquia.configuracion.relations.type}`;
+
+  $("#jer-descriptor").innerHTML = jerarquia.motivo.events.map((e, i) =>
+    `<option value="${i}">${i + 1} · h=${e[0]} · u=${e[1]} · v=${e[2]}</option>`).join("");
+
+  ["#jer-constituir-res", "#jer-preimagen-res", "#jer-elevacion-res"].forEach((s) => { $(s).innerHTML = ""; });
+}
+
+$("#jer-fixtures").addEventListener("click", async () => {
+  const caja = $("#jer-fixtures-res");
+  caja.innerHTML = `<p class="nota">Ejecutando…</p>`;
+  try {
+    const datos = await motor("jerarquiaFixtures", {});
+    if (!datos.ok) { caja.innerHTML = `<div class="aviso"><b>Error</b>${datos.error}</div>`; return; }
+    const r = datos.report;
+    caja.innerHTML = `
+      <div class="estado-linea">Resultado global ${chapa(r.status)}</div>
+      <div class="tabla-caja" style="margin-top:10px"><table>
+        <thead><tr><th>Comprobación</th><th>Estado</th></tr></thead>
+        <tbody>${r.checks.map((c) =>
+          `<tr><td style="white-space:normal">${c.name}</td><td>${chapa(c.status)}</td></tr>`).join("")}</tbody>
+      </table></div>
+      <p class="nota">${r.checks.length} comprobaciones. Las marcadas
+        <span class="mono">NOT_TESTABLE</span> o <span class="mono">NOT_SPECIFIED</span>
+        no son fallos: señalan lo que el marco declara fuera de su alcance.</p>`;
+  } catch (error) {
+    caja.innerHTML = `<div class="aviso"><b>Error del motor</b>${error.message}</div>`;
+  }
+});
+
+$("#jer-constituir").addEventListener("click", async () => {
+  const caja = $("#jer-constituir-res");
+  caja.innerHTML = `<p class="nota">Constituyendo…</p>`;
+  try {
+    const datos = await motor("jerarquiaConstituir", { configuracion: jerarquia.configuracion });
+    if (!datos.ok) { caja.innerHTML = `<div class="aviso"><b>Error</b>${datos.error}</div>`; return; }
+    const r = datos.result;
+    if (r.status === "OUT_OF_DOMAIN") {
+      caja.innerHTML = `<div class="aviso suave"><b>Fuera del dominio</b>${r.reason || ""}</div>`;
+      return;
+    }
+    const rec = r.record;
+    caja.innerHTML = `
+      <div class="estado-linea">${chapa(r.status)} <span class="mono">${rec.constitution_map_id}</span></div>
+      <div class="proc" style="margin-top:10px">
+        <div><span>Testigo</span><span>${rec.record_id}</span></div>
+        <div><span>Nivel</span><span>${rec.source_level} → ${rec.target_level}</span></div>
+        <div><span>Eventos del estado</span><span>${(rec.result_state.events || []).length}</span></div>
+      </div>
+      <details class="atajos"><summary>Estado motívico resultante</summary>
+        <div class="tabla-caja" style="padding:12px"><pre id="jer-pre-1">${JSON.stringify(rec.result_state, null, 1)}</pre></div>
+      </details>`;
+    $("#jer-pre-1").className = "";
+    $("#jer-pre-1").style.cssText = "margin:0;font-family:var(--mono);font-size:10.5px;white-space:pre-wrap;word-break:break-word";
+  } catch (error) {
+    caja.innerHTML = `<div class="aviso"><b>Error del motor</b>${error.message}</div>`;
+  }
+});
+
+$("#jer-preimagen").addEventListener("click", async () => {
+  const caja = $("#jer-preimagen-res");
+  caja.innerHTML = `<p class="nota">Construyendo…</p>`;
+  try {
+    const datos = await motor("jerarquiaPreimagen", { motivo: jerarquia.motivo });
+    if (!datos.ok) { caja.innerHTML = `<div class="aviso"><b>Error</b>${datos.error}</div>`; return; }
+    const rec = datos.record;
+    caja.innerHTML = `
+      <div class="estado-linea">${chapa(rec.verification_snapshot.status)} <span class="mono">${rec.record_id}</span></div>
+      <p class="nota">${(rec.provenance_metadata || {}).note || ""}</p>
+      <div class="proc" style="margin-top:6px">
+        <div><span>Ocurrencias de Ξ_X</span><span>${(rec.configuration.occurrences || []).length}</span></div>
+        <div><span>Nivel</span><span>${rec.source_level} → ${rec.target_level}</span></div>
+      </div>`;
+  } catch (error) {
+    caja.innerHTML = `<div class="aviso"><b>Error del motor</b>${error.message}</div>`;
+  }
+});
+
+$("#jer-elevacion").addEventListener("click", async () => {
+  const caja = $("#jer-elevacion-res");
+  const operador = $("#jer-operador").value;
+  const indice = Number($("#jer-descriptor").value) || 0;
+  const descriptor = jerarquia.motivo.events[indice];
+  const bruto = $("#jer-delta").value.trim();
+  // El motor espera entero para altura y fracción textual para los tiempos.
+  let delta = null;
+  if (operador === "pitch") delta = parseInt(bruto, 10);
+  else if (operador === "onset" || operador === "offset") delta = bruto;
+
+  caja.innerHTML = `<p class="nota">Verificando…</p>`;
+  try {
+    const datos = await motor("jerarquiaElevacion", {
+      configuracion: jerarquia.configuracion, operador, descriptor, delta,
+    });
+    if (!datos.ok) { caja.innerHTML = `<div class="aviso"><b>Error</b>${datos.error}</div>`; return; }
+    const c = datos.result.compatibility;
+    caja.innerHTML = `
+      <div class="estado-linea">Conmutatividad ${chapa(c.overall)}</div>
+      <div class="proc" style="margin-top:10px">
+        <div><span>Dominios</span><span>${chapa(c.domain_equality_status)}</span></div>
+        <div><span>Valores</span><span>${chapa(c.value_equality_status)}</span></div>
+        <div><span>Dominio no vacío</span><span>${chapa(c.nonempty_domain_status)}</span></div>
+        <div><span>Rama motivo</span><span>${c.motif_branch_state_id || "—"}</span></div>
+        <div><span>Rama basal</span><span>${c.lifted_branch_state_id || "—"}</span></div>
+      </div>`;
+  } catch (error) {
+    caja.innerHTML = `<div class="aviso"><b>Error del motor</b>${error.message}</div>`;
+  }
+});
+
+/* ══════════════════ Corpus extendido ══════════════════ */
+
+// Los identificadores del motor son los del §3.6; aquí se nombran en claro.
+const NOMBRE_LECTURA = {
+  structural: "Estructural",
+  rhythm: "Rítmica",
+  melodic_in: "Melódica interna",
+  melodic_out: "Melódica externa",
+  harmonic_root: "Armónica · fundamental",
+  harmonic_inversion: "Armónica · inversión",
+  harmonic_bass_motion: "Armónica · movimiento del bajo",
+  harmonic_interval_constitution: "Armónica · constitución interválica",
+  rhythmic_phase: "Rítmico-métrica · fase",
+  rhythmic_start: "Rítmico-métrica · inicio",
+};
+
+let informeExtendido = null;
+let texturaElegida = null;
+
+async function pintarExtendido() {
+  if (!informeExtendido) {
+    try {
+      const respuesta = await fetch("corpus/extendido.json");
+      if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+      informeExtendido = await respuesta.json();
+    } catch (error) {
+      $("#ext-lecturas").innerHTML = `<div class="aviso"><b>No se pudo cargar</b>${error.message}</div>`;
+      return;
+    }
+  }
+
+  const texturas = informeExtendido.texturas;
+  if (!texturaElegida) texturaElegida = texturas[0].textura;
+
+  $("#ext-texturas").innerHTML = texturas.map((t) =>
+    `<button type="button" class="filtro" data-textura="${t.textura}" aria-pressed="${t.textura === texturaElegida}">
+       ${t.textura} · ${t.lecturas.length} lecturas</button>`).join("");
+  $$("#ext-texturas .filtro").forEach((boton) => {
+    boton.addEventListener("click", () => { texturaElegida = boton.dataset.textura; pintarExtendido(); });
+  });
+
+  const bloque = texturas.find((t) => t.textura === texturaElegida);
+  const obras = bloque.obras;
+  const sectores = bloque.sectores;
+
+  $("#ext-lecturas").innerHTML = bloque.lecturas.map((l) => {
+    const sil = l.silueta;
+    const tamanos = l.familias.map((f) => f.miembros.length);
+    // Una sola familia con todo dentro significa que esa lectura no separa nada.
+    const plana = l.familias.length < 2;
+    return `
+      <details class="lectura">
+        <summary>
+          <div class="lectura-cab">
+            <b>${NOMBRE_LECTURA[l.id] || l.id}</b>
+            <span class="sil">${sil === null || sil === undefined ? "—" : sil.toFixed(3)}</span>
+          </div>
+          <div class="lectura-meta">
+            <span class="pastilla${plana ? " plana" : ""}">${l.familias.length} familia(s)${tamanos.length ? " · " + tamanos.join("+") : ""}</span>
+            <span class="pastilla">pureza ${l.pureza === null ? "—" : (l.pureza * 100).toFixed(1) + " %"}</span>
+            <span class="pastilla">H0 ${l.H0} · H1 ${l.H1}</span>
+          </div>
+          <div class="barra-sil"><i style="width:${Math.max(0, Math.min(1, sil || 0)) * 100}%"></i></div>
+        </summary>
+        <div class="lectura-cuerpo">
+          ${plana
+            ? `<p class="nota">Esta lectura no separa el corpus: los ${tamanos[0] || 0} registros
+                 caen en una sola familia y la silueta es cero. El componente no
+                 discrimina en este material.</p>`
+            : ""}
+          <div class="familia-lista">
+            ${l.familias.map((f) => `
+              <div class="familia-bloque">
+                <b>${f.id || "familia"} · ${f.miembros.length} registro(s)</b>
+                <p>${f.miembros.map((m) => `${obras[m] || m}<span class="nota"> (${sectores[m] || "sin sector"})</span>`).join(" · ")}</p>
+              </div>`).join("")}
+          </div>
+          ${l.medoide && l.medoide.obra
+            ? `<p class="nota"><b>Forma central</b> (medoide): ${l.medoide.obra}${l.medoide.compositor ? ` — ${l.medoide.compositor}` : ""}.</p>`
+            : ""}
+        </div>
+      </details>`;
+  }).join("") + `
+    <div class="aviso suave">
+      <b>Homología persistente vacía</b>
+      Las diecisiete lecturas devuelven H0 y H1 sin rasgos con los parámetros de
+      selección por defecto. Es un resultado, no un fallo: conviene poder
+      explicarlo.
+    </div>
+    <p class="nota">
+      La pureza mide cuánto coincide cada familia con la etiqueta publicitaria,
+      medida <b>después</b> de agrupar. La etiqueta no interviene en ninguna
+      distancia. Con «automoción» siendo el 24 % del corpus, una pureza cercana
+      a esa cifra equivale a no separar nada.
+    </p>`;
 }
 
 /* ══════════════════ Validación E3–E6 ══════════════════ */

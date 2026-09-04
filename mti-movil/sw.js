@@ -8,7 +8,7 @@
 
 // Subir este número en cada publicación: la caché es «primero lo guardado»,
 // así que sin cambiarlo un móvil que ya tenga la app seguiría con la anterior.
-const VERSION = "mti-movil-v3";
+const VERSION = "mti-movil-v5";
 const CACHE_APP = `${VERSION}-app`;
 const CACHE_MOTOR = `${VERSION}-motor`;
 
@@ -29,10 +29,16 @@ const RECURSOS = [
   "py/mticore/context.py",
   "py/mticore/version.py",
   "py/mticore/portable.py",
+  "py/mticore/hierarchy.py",
+  "py/mticore/operations.py",
+  "py/mticore/operational_topology.py",
+  "py/mticore/persistent_homology.py",
+  "py/mticore/ai_summaries.py",
   "ejemplos/beethoven_5_motif.mid",
   "ejemplos/guillermo_tell_motivo.mid",
   "corpus/corpus.json",
   "corpus/informe.json",
+  "corpus/extendido.json",
   "validacion/informe.json",
   "validacion/resumen.md",
 ];

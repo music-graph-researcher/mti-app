@@ -74,7 +74,31 @@ La etiqueta de sector **nunca entra en `Dγ`**. Se muestra al lado del resultado
 como contexto, igual que hace `backend/corpus_comparison.py`. La app ordena
 distancias; no clasifica ni predice sectores, y lo dice en pantalla.
 
-**7 · Validación.** La corrida `frozen` de E3–E6 sobre JKU-PDD: métricas
+**7 · Extendido.** Las lecturas comparativas del §3.6 sobre el mismo corpus:
+nueve en textura armónica y ocho en melódica —no hay movimiento del bajo en una
+línea sola—. Cada lectura con su silueta, sus familias, su pureza respecto de la
+etiqueta publicitaria, su homología persistente y su medoide o «forma central».
+
+Se muestran separadas y sin agregar, como exige el marco. Y se señala cuando una
+lectura no separa nada: fundamental, inversión y movimiento del bajo dejan los
+25 registros en una sola familia con silueta cero.
+
+**8 · Operacional.** El capítulo 5, en vivo. Eliges origen `X` y destino `Y`
+—el par canónico o dos motivos tuyos de la biblioteca— y calculas la trayectoria
+con su contraste §5.9.1, el testigo constructivo de alcanzabilidad, el multigrafo
+finito `G_R` dentro de una envolvente que controlas, y la comparación entre la
+topología estructural y la operacional. El informe completo se puede descargar.
+
+Sin resúmenes con IA: `backend/ai_summaries.py` llama a un servicio externo y
+aquí está sustituido por un módulo inerte. El cálculo es idéntico.
+
+**9 · Jerarquía.** El capítulo 6, en vivo. Las diecinueve comprobaciones
+fundacionales de la transición `A₀→₁`, la constitución con su testigo de
+procedencia, el constructor de preimagen y la verificación de que el diagrama de
+elevación conmuta. En vez de teclear JSON, la configuración basal `Ξ₀` se
+construye a partir de un motivo analizado en la propia app.
+
+**10 · Validación.** La corrida `frozen` de E3–E6 sobre JKU-PDD: métricas
 globales, los cinco pliegues con sus pesos seleccionados, las doce ablaciones
 con su delta frente al perfil completo, y la trazabilidad (commit, hashes,
 plataforma). Incluye el informe completo de la corrida.
@@ -90,8 +114,11 @@ eso condiciona qué significa «reproducible».
   el corpus. No recalcula matrices, clustering ni homología persistente: eso usa
   multiproceso, que Pyodide no soporta, y el corpus es fijo.
 - Del 8004 muestra una corrida ya ejecutada; no lanza corridas nuevas.
-- No cubre 8002 (operacional), 8003 (jerarquía) ni las lecturas contextuales
-  del 8005.
+- Del 8005 muestra el informe ya calculado; no admite corpus nuevos.
+- Del 8002 no trae los paneles de álgebra ni de refinamiento, ni el editor de
+  acciones paso a paso del escritorio.
+- Del 8003 expone las cuatro operaciones de su interfaz, no los veintiún
+  endpoints del servidor.
 - No importa `.mti.json` ni `.mti.csv`; de momento solo entra MIDI.
 - No exporta PDF. El SVG sirve para llevarlo a la tesis en vectorial.
 - No hace homología persistente ni clustering en vivo: es trabajo de corpus.
@@ -112,6 +139,19 @@ por tres o cuatro.
 | Motivo de Rossini (16 notas) | 16 | 63 | — | 0,04 s |
 | Motivo de Rossini completo | 39 | 155 | 0,00 s | ~0,1 s |
 | Mazurca de Chopin entera | 2.080 | ~5.000 | 2,5 s | más de un minuto |
+
+Y el resto de capítulos, medidos en el navegador:
+
+| Operación | Tiempo |
+|---|---:|
+| Proximidad al corpus (50 comparaciones) | 0,1 s |
+| Comprobaciones fundacionales del cap. 6 | instantáneo |
+| Constitución, preimagen, elevación | instantáneo |
+| Búsqueda `G_R` (400 nodos, 4 pasos) | ~11 s |
+| Comparación topológica | ~4 s |
+
+La búsqueda del capítulo 5 es lo único lento. Bajar «Nodos» de 400 a 150 la
+acorta mucho y sigue certificando la topología.
 
 La conclusión práctica está incorporada al diseño: **el marco pide un motivo, no
 una partitura**. Por eso la app avisa a partir de 250 eventos y no dibuja el
@@ -135,6 +175,7 @@ mti-movil/
 ├── py/
 │   ├── mti_bridge.py       única capa nueva: traduce peticiones al núcleo
 │   └── mticore/            copia literal de backend/ (no editar aquí)
+│                           salvo ai_summaries.py, que es un sustituto inerte
 ├── vendor/pyodide/         CPython 3 en WebAssembly (~13 MB)
 ├── corpus/                 nice-dataset e informe 8001, ya calculados
 ├── validacion/             corrida E3–E6 del 8004, de solo lectura
@@ -163,6 +204,15 @@ python3 ruta/a/mti-movil/herramientas/generar_validacion.py \
 
 Extrae 6 KB de métricas del `report.json` de 2,1 MB y copia el `summary.md`.
 
+Y las lecturas del corpus extendido:
+
+```bash
+python3 ruta/a/mti-movil/herramientas/generar_extendido.py \
+    --proyecto . --salida ruta/a/mti-movil/corpus
+```
+
+Tarda 7 s y produce 122 KB.
+
 ## Al publicar una versión nueva
 
 Sube el número de `VERSION` en `sw.js` (`mti-movil-v2` → `v3`). La caché sirve
@@ -175,12 +225,14 @@ Los módulos de `py/mticore/` son copias. Cuando toques `backend/` en el
 repositorio principal, vuelve a copiarlos:
 
 ```bash
-for f in midi mti analysis compare context version portable; do
+for f in midi mti analysis compare context version portable hierarchy \
+         operations operational_topology persistent_homology; do
   cp ruta/al/MTI/backend/$f.py py/mticore/$f.py
 done
 ```
 
-`py/mticore/__init__.py` es propio de esta carpeta: no lo sobrescribas.
+Dos archivos de `py/mticore/` son propios de esta carpeta y **no** deben
+sobrescribirse: `__init__.py` y `ai_summaries.py`, el sustituto sin red.
 
 Si añades un módulo nuevo, decláralo en dos sitios: `ARCHIVOS_PY` en
 `worker.js` y `RECURSOS` en `sw.js`.
