@@ -6,7 +6,9 @@
  * visita tarda y las siguientes abren al instante, con o sin red.
  */
 
-const VERSION = "mti-movil-v1";
+// Subir este número en cada publicación: la caché es «primero lo guardado»,
+// así que sin cambiarlo un móvil que ya tenga la app seguiría con la anterior.
+const VERSION = "mti-movil-v3";
 const CACHE_APP = `${VERSION}-app`;
 const CACHE_MOTOR = `${VERSION}-motor`;
 
@@ -29,6 +31,10 @@ const RECURSOS = [
   "py/mticore/portable.py",
   "ejemplos/beethoven_5_motif.mid",
   "ejemplos/guillermo_tell_motivo.mid",
+  "corpus/corpus.json",
+  "corpus/informe.json",
+  "validacion/informe.json",
+  "validacion/resumen.md",
 ];
 
 // El intérprete: aparte, porque son pocos archivos muy grandes y conviene

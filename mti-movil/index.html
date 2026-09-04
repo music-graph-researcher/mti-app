@@ -33,6 +33,8 @@
   <button type="button" class="paso" data-panel="p-tonica" disabled><b>3</b> Tónica</button>
   <button type="button" class="paso" data-panel="p-resultado" disabled><b>4</b> Análisis</button>
   <button type="button" class="paso" data-panel="p-biblioteca"><b>5</b> Biblioteca</button>
+  <button type="button" class="paso" data-panel="p-corpus"><b>6</b> Corpus</button>
+  <button type="button" class="paso" data-panel="p-validacion"><b>7</b> Validación</button>
 </nav>
 
 <main>
@@ -160,6 +162,9 @@
     <p class="nota">Descriptores <span class="mono">(h, u, v)</span> con racionales exactos.</p>
     <div class="tabla-caja"><table id="tabla-familia"></table></div>
 
+    <h2>Proximidad al corpus publicitario</h2>
+    <div id="cercania"></div>
+
     <h2>Procedencia</h2>
     <div class="proc" id="proc"></div>
 
@@ -174,6 +179,80 @@
   </div>
 
   <div class="aviso" id="aviso-resultado" hidden></div>
+</section>
+
+<!-- ═══════════ 6 · CORPUS ═══════════ -->
+<section id="p-corpus" class="panel">
+  <h1>Corpus publicitario</h1>
+  <p class="intro">
+    Veinticinco obras clásicas empleadas en publicidad, cada una en textura
+    armónica y melódica: cincuenta registros repartidos en quince sectores.
+  </p>
+
+  <div class="aviso suave">
+    <b>El sector nunca entra en el cálculo</b>
+    Es una etiqueta externa. <span class="mono">Dγ</span> se calcula solo sobre
+    la estructura del motivo, y la etiqueta se muestra al lado como contexto.
+    La app no predice sectores ni clasifica: ordena distancias.
+  </div>
+
+  <h2>Análisis de corpus, ya calculado</h2>
+  <p class="nota">
+    La matriz de 50×50, la jerarquía y las familias se calculan en el proyecto,
+    no aquí: el corpus es fijo y su análisis usa multiproceso, que el navegador
+    no admite. Esto es el resultado, no un recálculo.
+  </p>
+  <div class="cifras" id="corpus-cifras"></div>
+
+  <h2>Familias sugeridas y sectores</h2>
+  <div id="corpus-familias"></div>
+
+  <h2>Las veinticinco obras</h2>
+  <div class="filtros" id="corpus-sectores"></div>
+  <div class="lista" id="corpus-obras"></div>
+</section>
+
+<!-- ═══════════ 7 · VALIDACIÓN ═══════════ -->
+<section id="p-validacion" class="panel">
+  <h1>Validación empírica E3–E6</h1>
+  <p class="intro">
+    Corrida certificada sobre el corpus JKU-PDD, con validación cruzada dejando
+    fuera un grupo de procedencia cada vez.
+  </p>
+
+  <div class="aviso suave">
+    <b>Esto no se recalcula aquí</b>
+    La validación necesita los 384 MB del corpus JKU-PDD y usa multiproceso, que
+    el navegador no admite. Se muestra el resultado de una corrida
+    <span class="mono">frozen</span> ya ejecutada, con su trazabilidad completa.
+  </div>
+
+  <div id="val-cabecera"></div>
+
+  <h2>Métricas globales</h2>
+  <div class="cifras" id="val-metricas"></div>
+  <p class="nota" id="val-nota-metricas"></p>
+
+  <h2>Pliegues</h2>
+  <div class="tabla-caja"><table id="val-pliegues"></table></div>
+  <p class="nota">
+    Cada pliegue deja fuera una obra entera. Los pesos se eligen en desarrollo,
+    nunca sobre el grupo de prueba.
+  </p>
+
+  <h2>Ablaciones</h2>
+  <div class="tabla-caja"><table id="val-ablaciones"></table></div>
+  <p class="nota" id="val-nota-ablaciones"></p>
+
+  <h2>Trazabilidad</h2>
+  <div class="proc" id="val-traza"></div>
+
+  <div id="val-avisos"></div>
+
+  <details class="atajos" id="val-resumen-caja">
+    <summary>Informe completo de la corrida</summary>
+    <div class="tabla-caja" style="padding:12px"><pre id="val-resumen"></pre></div>
+  </details>
 </section>
 
 <!-- ═══════════ 5 · BIBLIOTECA ═══════════ -->

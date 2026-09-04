@@ -30,6 +30,7 @@ const ARCHIVOS_PY = [
 let pyodide = null;
 let puente = null;
 let arranque = null;
+let corpusCargado = null;
 
 function avisar(estado, texto) {
   self.postMessage({ tipo: "motor", estado, texto });
@@ -77,6 +78,24 @@ function asegurarMotor() {
   return arranque;
 }
 
+/* El corpus solo se carga si el usuario entra en esa parte de la app: son
+   44 KB y 50 conversiones que no tiene sentido pagar en cada arranque. */
+async function asegurarCorpus() {
+  if (!corpusCargado) {
+    corpusCargado = (async () => {
+      await asegurarMotor();
+      avisar("cargando", "Cargando el corpus…");
+      const respuesta = await fetch(new URL("corpus/corpus.json", self.location.href));
+      if (!respuesta.ok) throw new Error(`No se pudo cargar el corpus (HTTP ${respuesta.status})`);
+      const carga = JSON.parse(puente.load_corpus(await respuesta.text()));
+      if (!carga.ok) throw new Error(carga.error);
+      avisar("listo", "Motor listo");
+      return carga;
+    })().catch((error) => { corpusCargado = null; throw error; });
+  }
+  return corpusCargado;
+}
+
 const acciones = {
   async preparar() {
     const version = await asegurarMotor();
@@ -98,6 +117,17 @@ const acciones = {
   async portable({ resultado }) {
     await asegurarMotor();
     return JSON.parse(puente.portable(JSON.stringify(resultado)));
+  },
+
+  async corpus() {
+    return asegurarCorpus();
+  },
+
+  async rankearCorpus({ familia, parametros }) {
+    await asegurarCorpus();
+    return JSON.parse(
+      puente.rank_corpus(JSON.stringify(familia), JSON.stringify(parametros))
+    );
   },
 
   async comparar({ familiaA, familiaB, parametros, contextoA, contextoB }) {

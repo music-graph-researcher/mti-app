@@ -156,6 +156,8 @@ $$(".paso").forEach((boton) => {
   boton.addEventListener("click", () => {
     if (boton.disabled) return;
     if (boton.dataset.panel === "p-biblioteca") pintarBiblioteca();
+    if (boton.dataset.panel === "p-corpus") pintarCorpus();
+    if (boton.dataset.panel === "p-validacion") pintarValidacion();
     irA(boton.dataset.panel);
   });
 });
@@ -668,6 +670,143 @@ function pintarResultado(resultado, ms) {
   if ((resultado.warnings || []).length) {
     mostrarAviso("#aviso-resultado", `<b>Avisos del análisis</b>${resultado.warnings.join("<br>")}`, true);
   }
+
+  pintarCercania(familia);
+}
+
+/* ══════════════════ Proximidad al corpus ══════════════════ */
+
+const PESOS_BASE = { omega_pc: 1, omega_lin: 1, omega_on: 1, omega_off: 1, gamma: 1 };
+
+async function pintarCercania(familia) {
+  const caja = $("#cercania");
+  caja.innerHTML = `<p class="nota">Comparando con los 50 registros del corpus…</p>`;
+  try {
+    const datos = await motor("rankearCorpus", { familia, parametros: PESOS_BASE });
+    if (!datos.ok) { caja.innerHTML = `<p class="nota">No disponible: ${datos.error}</p>`; return; }
+
+    const filas = datos.filas;
+    const primeros = filas.slice(0, 6);
+    const diezSectores = new Set(filas.slice(0, 10).map((f) => f.sector));
+
+    caja.innerHTML = `
+      <div class="ranking">
+        ${primeros.map((f, i) => `
+          <div class="rank-fila">
+            <span class="rank-num">${i + 1}</span>
+            <div class="rank-cuerpo">
+              <b>${f.obra}</b>
+              <small>${f.compositor} · ${f.textura} · ${f.eventos} eventos</small>
+              <div class="rank-barra"><i style="width:${(f.relativa.value * 100).toFixed(1)}%"></i></div>
+            </div>
+            <div class="rank-cifras">
+              <span class="mono">${f.relativa.value.toFixed(3)}</span>
+              <span class="sector">${f.sector}</span>
+            </div>
+          </div>`).join("")}
+      </div>
+      <p class="nota">
+        Ordenado por índice relativo <span class="mono">D̄γ</span>, de 0 (idéntico) a 1.
+        Los diez registros más próximos pertenecen a <b>${diezSectores.size}</b>
+        sectores distintos de los quince del corpus.
+      </p>
+      <div class="aviso suave">
+        <b>Esto es proximidad, no clasificación</b>
+        El sector es una etiqueta externa que no interviene en <span class="mono">Dγ</span>.
+        Con 25 obras en 15 categorías, seis de ellas con una sola obra, ninguna
+        lectura clasificatoria se sostiene.
+      </div>`;
+  } catch (error) {
+    caja.innerHTML = `<p class="nota">No se pudo comparar con el corpus: ${error.message}</p>`;
+  }
+}
+
+/* ══════════════════ Panel del corpus ══════════════════ */
+
+let informeCorpus = null;
+let sectorElegido = null;
+
+async function pintarCorpus() {
+  if (!informeCorpus) {
+    try {
+      const respuesta = await fetch("corpus/informe.json");
+      if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+      informeCorpus = await respuesta.json();
+    } catch (error) {
+      $("#corpus-cifras").innerHTML = `<p class="nota">No se pudo cargar el informe: ${error.message}</p>`;
+      return;
+    }
+  }
+
+  const r = informeCorpus.resumen;
+  $("#corpus-cifras").innerHTML = [
+    [r.items, "registros"],
+    [r.comparisons, "comparaciones"],
+    [r.advertising_types, "sectores"],
+    [r.silhouette.toFixed(3), "silueta"],
+  ].map(([v, e]) => `<div class="cifra"><b>${v}</b><span>${e}</span></div>`).join("");
+
+  // Familias con su composición por sector: la lectura honesta del clustering
+  const asociaciones = informeCorpus.asociaciones.rows;
+  $("#corpus-familias").innerHTML = asociaciones.map((fila) => {
+    const cuentas = Object.entries(fila.counts).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+    const [dominante, n] = cuentas[0] || ["—", 0];
+    const pureza = fila.total ? n / fila.total : 0;
+    return `
+      <div class="familia">
+        <div class="familia-cab">
+          <b>${fila.family}</b>
+          <span>${fila.total} registro(s)</span>
+        </div>
+        <div class="familia-sectores">
+          ${cuentas.map(([s, c]) => `<span class="sector">${s} · ${c}</span>`).join("")}
+        </div>
+        <p class="nota">
+          Sector dominante <b>${dominante}</b>, con una pureza del
+          <b>${(pureza * 100).toFixed(1)} %</b>.
+        </p>
+      </div>`;
+  }).join("") + `
+    <div class="aviso suave">
+      <b>Cómo leer esto</b>
+      El clustering estructural agrupa casi todo el corpus en una sola familia,
+      y su composición reproduce el reparto de sectores de partida. Con estos
+      pesos y esta lectura, la estructura del motivo no separa por sector.
+      Las lecturas contextuales y categóricas del capítulo del corpus extendido
+      interrogan ese mismo eje por otras vías.
+    </div>`;
+
+  // Obras, filtrables por sector
+  const sectores = [...new Set(informeCorpus.items.map((i) => i.sector))].sort();
+  $("#corpus-sectores").innerHTML =
+    `<button type="button" class="filtro" data-sector="" aria-pressed="${!sectorElegido}">Todos</button>` +
+    sectores.map((s) => `<button type="button" class="filtro" data-sector="${s}" aria-pressed="${sectorElegido === s}">${s}</button>`).join("");
+
+  $$("#corpus-sectores .filtro").forEach((boton) => {
+    boton.addEventListener("click", () => {
+      sectorElegido = boton.dataset.sector || null;
+      pintarCorpus();
+    });
+  });
+
+  // Una fila por obra, no por registro: las dos texturas son la misma obra
+  const porObra = new Map();
+  informeCorpus.items.forEach((i) => {
+    if (sectorElegido && i.sector !== sectorElegido) return;
+    if (!porObra.has(i.obra)) porObra.set(i.obra, { ...i, texturas: [] });
+    porObra.get(i.obra).texturas.push(i.textura);
+  });
+
+  $("#corpus-obras").innerHTML = [...porObra.values()]
+    .sort((a, b) => a.sector.localeCompare(b.sector) || a.obra.localeCompare(b.obra))
+    .map((i) => `
+      <div class="ficha" style="cursor:default">
+        <div class="cuerpo">
+          <b>${i.obra}</b>
+          <small>${i.compositor} · ${i.texturas.join(" y ")} · p_ton ${nombreNota(i.tonica)}</small>
+        </div>
+        <span class="sector">${i.sector}</span>
+      </div>`).join("") || `<div class="vacio">Sin obras en ese sector</div>`;
 }
 
 function construirSvg(resultado) {
@@ -1015,6 +1154,135 @@ function pintarContextual(datos) {
     <div class="proc">
       ${filas.map(([etiqueta, , valor]) => `<div><span>${etiqueta}</span><span>${valor}</span></div>`).join("")}
     </div>`;
+}
+
+/* ══════════════════ Validación E3–E6 ══════════════════ */
+
+let informeValidacion = null;
+
+async function pintarValidacion() {
+  if (!informeValidacion) {
+    try {
+      const respuesta = await fetch("validacion/informe.json");
+      if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+      informeValidacion = await respuesta.json();
+    } catch (error) {
+      $("#val-cabecera").innerHTML = `<div class="aviso"><b>No se pudo cargar el informe</b>${error.message}</div>`;
+      return;
+    }
+  }
+
+  const v = informeValidacion;
+  const pct = (x) => (x === null || x === undefined ? "—" : (x * 100).toFixed(1) + " %");
+  const num = (x) => (x === null || x === undefined ? "—" : Number(x).toFixed(4));
+
+  $("#val-cabecera").innerHTML = `
+    <div class="sello">
+      <span class="sello-punto"></span>
+      <div>
+        <b>${v.estatus === "empirical_frozen" ? "Corrida congelada · afirmaciones empíricas permitidas" : v.estatus}</b>
+        <small>${v.run_id}</small>
+      </div>
+    </div>
+    <div class="proc">
+      <div><span>Ocurrencias</span><span>${v.corpus.occurrences}</span></div>
+      <div><span>Familias</span><span>${v.corpus.families}</span></div>
+      <div><span>Grupos de procedencia</span><span>${v.corpus.groups}</span></div>
+      <div><span>Ámbitos de anotación</span><span>${v.corpus.scopes}</span></div>
+      <div><span>Consultas elegibles</span><span>${v.corpus.eligible_queries}</span></div>
+      <div><span>Consultas excluidas</span><span>${v.corpus.excluded_queries}</span></div>
+      <div><span>Partición</span><span>${v.particion.type}</span></div>
+      <div><span>Rejilla de parámetros</span><span>${v.configuracion.tamano_rejilla} candidatos</span></div>
+    </div>`;
+
+  const g = v.metricas_globales;
+  $("#val-metricas").innerHTML = [
+    [num(g.mAP), "mAP"],
+    [num(g.MRR), "MRR"],
+    [pct(g["Recall@1"]), "Recall@1"],
+    [pct(g["Recall@10"]), "Recall@10"],
+  ].map(([x, e]) => `<div class="cifra"><b>${x}</b><span>${e}</span></div>`).join("");
+
+  const m = v.metricas_macro;
+  $("#val-nota-metricas").innerHTML =
+    `Agregadas sobre las ${g.eligible_queries} consultas. Promediando por pliegue en vez de por consulta: ` +
+    `mAP ${num(m.mAP)}, MRR ${num(m.MRR)}. Intervalos por <i>${v.incertidumbre.method}</i> ` +
+    `sobre ${v.incertidumbre.replicates.toLocaleString("es")} réplicas, semilla ${v.incertidumbre.seed}.`;
+
+  $("#val-pliegues").innerHTML = `
+    <thead><tr><th>Grupo excluido</th><th>n</th><th>mAP</th><th>MRR</th><th>γ</th><th>ω pc/lin/on/off</th></tr></thead>
+    <tbody>${v.pliegues.map((p) => {
+      const q = p.parametros || {};
+      return `<tr>
+        <td>${p.grupo_test}</td>
+        <td>${p.consultas}</td>
+        <td>${num(p.metricas.mAP)}</td>
+        <td>${num(p.metricas.MRR)}</td>
+        <td>${q.gamma ?? "—"}</td>
+        <td>${[q.omega_pc, q.omega_lin, q.omega_on, q.omega_off].filter(Boolean).join(" / ") || "—"}</td>
+      </tr>`;
+    }).join("")}</tbody>`;
+
+  $("#val-ablaciones").innerHTML = `
+    <thead><tr><th>Id</th><th>Ablación</th><th>mAP</th><th>Δ mAP</th><th>Estatus</th></tr></thead>
+    <tbody>${v.ablaciones.map((a) => {
+      const d = a.delta_mAP;
+      const clase = d > 0.001 ? "pos" : d < -0.001 ? "neg" : "";
+      return `<tr>
+        <td>${a.id}</td>
+        <td style="white-space:normal;min-width:180px">${a.etiqueta}</td>
+        <td>${num(a.mAP)}</td>
+        <td class="${clase}">${d >= 0 ? "+" : ""}${num(d)}</td>
+        <td style="white-space:normal">${a.estatus}</td>
+      </tr>`;
+    }).join("")}</tbody>`;
+
+  const completo = v.ablaciones.find((a) => a.estatus === "metric_profile" && Math.abs(a.delta_mAP) < 1e-9);
+  $("#val-nota-ablaciones").innerHTML =
+    `Δ mAP es la diferencia frente al perfil MTI completo${completo ? ` (<b>${completo.id}</b>)` : ""}. ` +
+    `Solo las marcadas <span class="mono">metric_profile</span> son métricas; las demás se declaran ` +
+    `pseudométricas o experimentales y no sostienen afirmaciones de distancia.`;
+
+  const t = v.trazabilidad;
+  $("#val-traza").innerHTML = [
+    ["Software", `${t.software.name} ${t.software.version}`],
+    ["Python", `${t.python.version} (${t.python.implementation})`],
+    ["Plataforma", t.plataforma],
+    ["Commit", (t.commit || "").slice(0, 12)],
+    ["Rama", t.rama],
+    ["Árbol de trabajo", t.arbol_limpio ? "limpio" : "con cambios sin confirmar"],
+    ["SHA-256 del árbol", (t.sha256_arbol || "").slice(0, 16) + "…"],
+    ["SHA-256 del manifiesto", (t.sha256_manifiesto || "").slice(0, 16) + "…"],
+    ["Duración", `${Math.round((v.duracion_segundos || 0) / 60)} min`],
+  ].map(([k, x]) => `<div><span>${k}</span><span>${x ?? "—"}</span></div>`).join("");
+
+  const avisos = [];
+  if (!t.arbol_limpio) {
+    avisos.push(`<div class="aviso suave"><b>Árbol de trabajo con cambios sin confirmar</b>
+      La corrida se ejecutó con modificaciones no registradas en el commit
+      ${(t.commit || "").slice(0, 12)}. El hash del árbol fuente queda anotado, pero
+      reproducir la corrida exige ese estado exacto, no solo el commit.</div>`);
+  }
+  if (v.avisos.length) {
+    avisos.push(`<div class="aviso suave"><b>${v.avisos.length} aviso(s) del ejecutor</b>
+      ${v.avisos.map((a) => a.mensaje).join("<br>")}</div>`);
+  }
+  if (v.errores.length) {
+    avisos.push(`<div class="aviso"><b>${v.errores.length} error(es)</b>${v.errores.join("<br>")}</div>`);
+  }
+  $("#val-avisos").innerHTML = avisos.join("");
+
+  if (!pintarValidacion.resumenCargado) {
+    pintarValidacion.resumenCargado = true;
+    try {
+      const respuesta = await fetch("validacion/resumen.md");
+      $("#val-resumen").textContent = respuesta.ok
+        ? await respuesta.text()
+        : "No disponible.";
+    } catch {
+      $("#val-resumen").textContent = "No disponible.";
+    }
+  }
 }
 
 /* ══════════════════ Modo sin conexión ══════════════════ */

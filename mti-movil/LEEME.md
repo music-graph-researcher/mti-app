@@ -65,14 +65,39 @@ exactos y bloque de procedencia con el SHA-256 del MIDI de entrada. Exporta
 Elige dos y calcula `Dγ`, el índice relativo `D̄γ` y los bloques contextuales
 §3.6 —melódico, armónico y rítmico-métrico— sin agregarlos entre sí.
 
+**6 · Corpus.** Las 25 obras clásicas empleadas en publicidad, en sus dos
+texturas, con el análisis de corpus ya calculado: familias, silueta y
+composición por sector. Y en cada análisis, la proximidad del motivo a los 50
+registros.
+
+La etiqueta de sector **nunca entra en `Dγ`**. Se muestra al lado del resultado
+como contexto, igual que hace `backend/corpus_comparison.py`. La app ordena
+distancias; no clasifica ni predice sectores, y lo dice en pantalla.
+
+**7 · Validación.** La corrida `frozen` de E3–E6 sobre JKU-PDD: métricas
+globales, los cinco pliegues con sus pesos seleccionados, las doce ablaciones
+con su delta frente al perfil completo, y la trazabilidad (commit, hashes,
+plataforma). Incluye el informe completo de la corrida.
+
+De solo lectura, y a propósito: la validación necesita los 384 MB del corpus y
+multiproceso. Una corrida certificada se exhibe, no se rehace en un móvil. La
+app señala además que el árbol de trabajo tenía cambios sin confirmar, porque
+eso condiciona qué significa «reproducible».
+
 ## Qué no hace todavía
 
-- No cubre las apps 8001 a 8005 (corpus, topología operacional, jerarquía,
-  validación empírica). Solo el visualizador y la comparación del 8000.
+- Del 8001 solo trae el informe ya calculado y la comparación por pares contra
+  el corpus. No recalcula matrices, clustering ni homología persistente: eso usa
+  multiproceso, que Pyodide no soporta, y el corpus es fijo.
+- Del 8004 muestra una corrida ya ejecutada; no lanza corridas nuevas.
+- No cubre 8002 (operacional), 8003 (jerarquía) ni las lecturas contextuales
+  del 8005.
 - No importa `.mti.json` ni `.mti.csv`; de momento solo entra MIDI.
 - No exporta PDF. El SVG sirve para llevarlo a la tesis en vectorial.
-- No hace homología persistente ni clustering: eso es trabajo de corpus y no
-  tiene sentido en un móvil.
+- No hace homología persistente ni clustering en vivo: es trabajo de corpus.
+- No incluye `backend/ai_summaries.py`, que llama a la API de DeepSeek. Es lo
+  único del proyecto que enviaría datos fuera del dispositivo, y queda excluido
+  deliberadamente.
 
 ---
 
@@ -100,7 +125,7 @@ los ejemplos justamente para poder enseñar ese límite en la defensa.
 
 ```
 mti-movil/
-├── index.html              interfaz, cinco pasos
+├── index.html              interfaz, siete pasos
 ├── styles.css              hoja única, claro y oscuro
 ├── app.js                  interacción: piano-roll, selección, presentación
 ├── worker.js               arranca Pyodide y expone el núcleo MTI
@@ -111,9 +136,38 @@ mti-movil/
 │   ├── mti_bridge.py       única capa nueva: traduce peticiones al núcleo
 │   └── mticore/            copia literal de backend/ (no editar aquí)
 ├── vendor/pyodide/         CPython 3 en WebAssembly (~13 MB)
+├── corpus/                 nice-dataset e informe 8001, ya calculados
+├── validacion/             corrida E3–E6 del 8004, de solo lectura
+├── herramientas/           guiones que regeneran corpus/ y validacion/
 ├── ejemplos/               cuatro MIDIs de prueba
 └── iconos/
 ```
+
+## Regenerar los datos del corpus
+
+`corpus/corpus.json` y `corpus/informe.json` se producen desde el proyecto:
+
+```bash
+python3 ruta/a/mti-movil/herramientas/generar_corpus.py \
+    --proyecto . --salida ruta/a/mti-movil/corpus
+```
+
+Hazlo desde la raíz del repositorio MTI. Son 44 KB y 78 KB.
+
+Y el informe de validación, desde una corrida cualquiera:
+
+```bash
+python3 ruta/a/mti-movil/herramientas/generar_validacion.py \
+    --corrida runs/<run_id> --salida ruta/a/mti-movil/validacion
+```
+
+Extrae 6 KB de métricas del `report.json` de 2,1 MB y copia el `summary.md`.
+
+## Al publicar una versión nueva
+
+Sube el número de `VERSION` en `sw.js` (`mti-movil-v2` → `v3`). La caché sirve
+primero lo guardado, así que sin ese cambio un móvil que ya tenga la app
+instalada seguiría abriendo la versión anterior.
 
 ## Si cambia el núcleo del proyecto
 

@@ -18,11 +18,19 @@ import hashlib
 import json
 from typing import Any
 
-from mticore.compare import ComparisonError, compare_families
+from mticore.compare import (
+    ComparisonError,
+    compare_families,
+    compare_families_compact,
+)
 from mticore.context import ContextError, compare_contexts
 from mticore.midi import MidiParseError, parse_midi
 from mticore.mti import MTIError, build_mti_graph
-from mticore.portable import PortableMTIError, portable_document_from_graph
+from mticore.portable import (
+    PortableMTIError,
+    graph_from_portable,
+    portable_document_from_graph,
+)
 from mticore.version import SOFTWARE_VERSION
 
 # Errores que representan una entrada inválida del usuario, no un fallo del
@@ -203,3 +211,88 @@ def compare_with_context(
 
     payload["contextual"] = contextual
     return json.dumps(payload, ensure_ascii=False)
+
+
+# ─────────────────────────── Corpus publicitario ───────────────────────────
+#
+# El corpus es fijo: 25 obras clásicas empleadas en publicidad, cada una en
+# textura armónica y melódica. Se carga una sola vez y se conserva en memoria,
+# porque la app lo consulta en cada análisis.
+#
+# La etiqueta de sector NUNCA entra en el cálculo. Es una etiqueta externa que
+# se muestra junto al resultado, como en `backend/corpus_comparison.py`.
+
+_CORPUS: list[dict[str, Any]] = []
+
+
+def load_corpus(corpus_json: str) -> str:
+    """Convierte los documentos portables del corpus en familias comparables."""
+
+    global _CORPUS
+    try:
+        paquete = json.loads(corpus_json)
+        metadatos = paquete["items"]
+        documentos = paquete["documents"]
+        cargado = []
+        for nombre, info in metadatos.items():
+            grafo = graph_from_portable(documentos[nombre], nombre)
+            cargado.append(
+                {
+                    "id": info["id"],
+                    "obra": info["work"],
+                    "compositor": info["composer"],
+                    "sector": info["advertising_type"],
+                    "textura": info["texture"],
+                    "tonica": info["tonic_pitch"],
+                    "familia": grafo["normalized_family"],
+                }
+            )
+    except _INPUT_ERRORS as exc:
+        return _fail(f"No se pudo cargar el corpus: {exc}")
+
+    _CORPUS = cargado
+    sectores = sorted({r["sector"] for r in cargado})
+    return _ok(
+        {
+            "registros": len(cargado),
+            "obras": len({r["obra"] for r in cargado}),
+            "sectores": sectores,
+        }
+    )
+
+
+def rank_corpus(family_json: str, parameters_json: str) -> str:
+    """Sitúa una familia frente a los registros del corpus, uno a uno.
+
+    Son comparaciones por pares, que es lo único que define el marco. No hay
+    aquí ningún análisis de corpus: el ranking ordena distancias, no clasifica.
+    Se usa la variante compacta porque no hace falta la explicación evento a
+    evento de cincuenta comparaciones.
+    """
+
+    if not _CORPUS:
+        return _fail("El corpus no está cargado")
+    try:
+        consulta = json.loads(family_json)
+        parametros = json.loads(parameters_json)
+        filas = []
+        for registro in _CORPUS:
+            resultado = compare_families_compact(consulta, registro["familia"], parametros)
+            filas.append(
+                {
+                    "id": registro["id"],
+                    "obra": registro["obra"],
+                    "compositor": registro["compositor"],
+                    "sector": registro["sector"],
+                    "textura": registro["textura"],
+                    "eventos": len(registro["familia"]),
+                    "distancia": resultado["distance"],
+                    "relativa": resultado["relative_index"]["dissimilarity"],
+                    "componentes": resultado["components"],
+                }
+            )
+    except _INPUT_ERRORS as exc:
+        return _fail(str(exc))
+
+    filas.sort(key=lambda f: f["relativa"]["value"])
+    return _ok({"filas": filas, "parametros": parametros})
