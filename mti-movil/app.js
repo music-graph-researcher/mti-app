@@ -34,7 +34,7 @@ const motor = (() => {
   let siguiente = 0;
 
   function crear() {
-    worker = new Worker("worker.js", { type: "module" });
+    worker = new Worker("worker.js?v=6", { type: "module" });
     worker.onmessage = ({ data }) => {
       if (data.tipo === "motor") {
         pintarEstadoMotor(data.estado, data.texto);

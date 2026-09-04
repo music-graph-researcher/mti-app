@@ -215,9 +215,20 @@ Tarda 7 s y produce 122 KB.
 
 ## Al publicar una versión nueva
 
-Sube el número de `VERSION` en `sw.js` (`mti-movil-v2` → `v3`). La caché sirve
-primero lo guardado, así que sin ese cambio un móvil que ya tenga la app
-instalada seguiría abriendo la versión anterior.
+Un solo comando, antes de subir nada:
+
+```bash
+python3 herramientas/versionar.py 7
+```
+
+Cambia la versión en los cuatro sitios donde tiene que coincidir: `VERSION` en
+`sw.js`, las consultas `?v=` de `styles.css` y `app.js` en `index.html`, la del
+worker en `app.js`, y las de `RECURSOS` en `sw.js`.
+
+Hacerlo a mano en uno solo produce un fallo desagradable y difícil de leer: el
+navegador se trae el `index.html` nuevo y reutiliza de su caché HTTP el `app.js`
+viejo, así que aparecen pestañas que existen y no hacen nada, sin ningún error
+en consola. Pasó una vez; el guion existe para que no vuelva a pasar.
 
 ## Si cambia el núcleo del proyecto
 
