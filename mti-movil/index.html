@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12100e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MTI">
+<meta name="description" content="Marco Topológico Invariante: análisis de motivos a partir de cualquier MIDI, sin servidor y sin conexión.">
+<title>MTI · análisis de motivos</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="iconos/icono.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="iconos/icono-180.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="barra">
+  <div class="marca">
+    <span class="sigla">MTI</span>
+    <span class="lema">Marco Topológico Invariante</span>
+  </div>
+  <button id="btn-motor" class="motor" type="button" aria-live="polite">
+    <span class="punto" data-estado="frio"></span>
+    <span id="motor-texto">Motor en reposo</span>
+  </button>
+</header>
+
+<nav class="pasos" id="pasos" aria-label="Pasos del análisis">
+  <button type="button" class="paso activo" data-panel="p-archivo"><b>1</b> Archivo</button>
+  <button type="button" class="paso" data-panel="p-fragmento" disabled><b>2</b> Fragmento</button>
+  <button type="button" class="paso" data-panel="p-tonica" disabled><b>3</b> Tónica</button>
+  <button type="button" class="paso" data-panel="p-resultado" disabled><b>4</b> Análisis</button>
+  <button type="button" class="paso" data-panel="p-biblioteca"><b>5</b> Biblioteca</button>
+</nav>
+
+<main>
+
+<!-- ═══════════ 1 · ARCHIVO ═══════════ -->
+<section id="p-archivo" class="panel activo">
+  <h1>Analiza cualquier MIDI</h1>
+  <p class="intro">
+    Todo el cálculo ocurre dentro de este dispositivo. No se envía ningún archivo
+    a ningún servidor y, una vez preparado el modo sin conexión, funciona sin red.
+  </p>
+
+  <label class="zona-carga" id="zona-carga" for="archivo">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V15"/></svg>
+    <b>Elegir un archivo MIDI</b>
+    <span>.mid o .midi · tipo 0 y 1</span>
+    <input type="file" id="archivo" accept=".mid,.midi,audio/midi,audio/x-midi" hidden>
+  </label>
+
+  <h2>O prueba con un ejemplo</h2>
+  <div class="ejemplos" id="ejemplos">
+    <button type="button" data-src="ejemplos/beethoven_5_motif.mid" data-tonica="60">
+      <b>Beethoven · Quinta</b><span>Motivo de cuatro notas · 8 eventos</span>
+    </button>
+    <button type="button" data-src="ejemplos/guillermo_tell_motivo.mid" data-tonica="60">
+      <b>Rossini · Guillermo Tell</b><span>Motivo · 39 eventos</span>
+    </button>
+    <button type="button" data-src="ejemplos/chopin_mazurka24-4.mid" data-tonica="60">
+      <b>Chopin · Mazurca op. 24 n.º 4</b><span>Obra completa · ~1.900 eventos</span>
+    </button>
+    <button type="button" data-src="ejemplos/beethoven_sonata_03-1.mid" data-tonica="60">
+      <b>Beethoven · Sonata 3, I</b><span>Obra completa · 2.378 eventos</span>
+    </button>
+  </div>
+  <p class="nota">
+    Las dos obras completas están aquí a propósito: sirven para ver por qué el
+    marco pide un fragmento y no una partitura entera.
+  </p>
+
+  <div class="aviso" id="aviso-archivo" hidden></div>
+</section>
+
+<!-- ═══════════ 2 · FRAGMENTO ═══════════ -->
+<section id="p-fragmento" class="panel">
+  <h1>Elige el fragmento</h1>
+  <p class="intro">
+    La segmentación es una entrada externa del marco: el MTI no decide dónde
+    empieza ni acaba un motivo. Arrastra sobre el rollo para acotarlo.
+  </p>
+
+  <div class="rollo-caja">
+    <canvas id="rollo" height="240"></canvas>
+    <div class="rollo-vacio" id="rollo-vacio" hidden>Sin notas con los filtros actuales</div>
+  </div>
+
+  <div class="acciones-rollo">
+    <button type="button" id="sel-todo" class="sec">Todo el archivo</button>
+    <button type="button" id="sel-limpiar" class="sec">Limpiar selección</button>
+    <button type="button" id="sel-primeras" class="sec">Primeras 16 notas</button>
+  </div>
+
+  <div id="filtros" class="filtros"></div>
+
+  <div class="resumen-sel" id="resumen-sel"></div>
+  <div class="aviso" id="aviso-tamano" hidden></div>
+
+  <button type="button" id="ir-tonica" class="principal" disabled>Continuar a la tónica</button>
+</section>
+
+<!-- ═══════════ 3 · TÓNICA ═══════════ -->
+<section id="p-tonica" class="panel">
+  <h1>Referencia tonal <span class="mono">p_ton</span></h1>
+  <p class="intro">
+    Es una decisión del analista, no un dato del archivo. De ella dependen las
+    alturas relativas <span class="mono">h = p − p_ton</span> y, por tanto, todo
+    el perfil. El MIDI no la contiene y la app no la infiere.
+  </p>
+
+  <div class="tonica-caja">
+    <div class="tonica-valor">
+      <span id="tonica-nombre">Do4</span>
+      <span class="mono" id="tonica-midi">MIDI 60</span>
+    </div>
+    <input type="range" id="tonica-rango" min="0" max="127" value="60" step="1" aria-label="Altura MIDI de la referencia tonal">
+    <div class="teclas" id="teclas" role="group" aria-label="Clase de altura"></div>
+    <div class="octavas">
+      <label for="octava">Octava</label>
+      <input type="number" id="octava" min="-1" max="9" value="4" step="1">
+    </div>
+  </div>
+
+  <details class="atajos">
+    <summary>Atajos a partir del fragmento</summary>
+    <p class="nota">
+      Son conveniencias estadísticas sobre las notas seleccionadas, no
+      afirmaciones analíticas. El marco no deriva <span class="mono">p_ton</span>
+      del material: la eliges tú.
+    </p>
+    <div id="sugerencias" class="sugerencias"></div>
+  </details>
+
+  <button type="button" id="analizar" class="principal">Analizar fragmento</button>
+</section>
+
+<!-- ═══════════ 4 · RESULTADO ═══════════ -->
+<section id="p-resultado" class="panel">
+  <h1>Análisis MTI</h1>
+  <div id="resultado-cargando" class="cargando" hidden>
+    <div class="giro"></div>
+    <p id="cargando-texto">Preparando el motor…</p>
+    <button type="button" id="cancelar-analisis" class="sec">Cancelar</button>
+  </div>
+
+  <div id="resultado-cuerpo" hidden>
+    <div class="cifras" id="cifras"></div>
+
+    <h2>Grafo</h2>
+    <div class="grafo-caja" id="grafo-caja"></div>
+    <p class="nota" id="grafo-nota"></p>
+
+    <h2>Firma canónica</h2>
+    <div class="firma" id="firma"></div>
+
+    <h2>Familia normalizada</h2>
+    <p class="nota">Descriptores <span class="mono">(h, u, v)</span> con racionales exactos.</p>
+    <div class="tabla-caja"><table id="tabla-familia"></table></div>
+
+    <h2>Procedencia</h2>
+    <div class="proc" id="proc"></div>
+
+    <div class="acciones-resultado">
+      <button type="button" id="guardar" class="principal">Guardar en la biblioteca</button>
+      <div class="exportar">
+        <button type="button" id="exp-portable" class="sec">.mti.json</button>
+        <button type="button" id="exp-analisis" class="sec">Análisis completo</button>
+        <button type="button" id="exp-svg" class="sec">Grafo SVG</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="aviso" id="aviso-resultado" hidden></div>
+</section>
+
+<!-- ═══════════ 5 · BIBLIOTECA ═══════════ -->
+<section id="p-biblioteca" class="panel">
+  <h1>Biblioteca</h1>
+  <p class="intro">
+    Los motivos analizados se guardan en este dispositivo. Elige dos para
+    calcular la distancia <span class="mono">Dγ</span>.
+  </p>
+
+  <div id="lista-biblioteca" class="lista"></div>
+
+  <div class="comparar-caja" id="comparar-caja" hidden>
+    <h2>Comparación</h2>
+    <p class="nota" id="comparar-quienes"></p>
+    <details class="pesos">
+      <summary>Pesos del perfil métrico</summary>
+      <p class="nota">
+        Configuración operativa, no una afirmación de universalidad musical.
+        Mantenlos constantes si comparas un corpus sobre la misma escala.
+      </p>
+      <div class="rejilla-pesos">
+        <label>ω<sub>pc</sub><input type="number" id="w-pc" value="1" min="0" step="0.5"></label>
+        <label>ω<sub>lin</sub><input type="number" id="w-lin" value="1" min="0" step="0.5"></label>
+        <label>ω<sub>on</sub><input type="number" id="w-on" value="1" min="0" step="0.5"></label>
+        <label>ω<sub>off</sub><input type="number" id="w-off" value="1" min="0" step="0.5"></label>
+        <label>γ<input type="number" id="w-gamma" value="1" min="0" step="0.5"></label>
+      </div>
+    </details>
+    <button type="button" id="btn-comparar" class="principal">Calcular Dγ</button>
+    <div id="resultado-comparacion"></div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <button type="button" id="btn-offline" class="sec ancho">Preparar modo sin conexión</button>
+  <p class="nota" id="offline-estado">
+    Descarga el motor Python y lo deja en caché. Hazlo antes de la presentación:
+    después la app abre y calcula sin red.
+  </p>
+  <p class="creditos">
+    Núcleo MTI <span class="mono" id="version-nucleo">—</span> ejecutado íntegro en
+    el navegador. Los módulos son copia literal de <span class="mono">backend/</span>.
+  </p>
+</footer>
+
+<div class="brindis" id="brindis" role="status" aria-live="polite" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
