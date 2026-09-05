@@ -95,18 +95,27 @@ Los datos salen del propio informe de escritorio; no se recalcula nada.
 Al tocar una casilla, el rótulo bajo la cuadrícula nombra las dos obras con el
 valor y el puesto de esa lectura, y el bloque de abajo despliega las nueve.
 
-Sobre el color: las nueve matrices comparten **una sola rampa de un tono**, y es
-deliberado. Si cada lectura tuviera su gama, dos casillas del mismo color en
-matrices distintas dejarían de significar lo mismo y la comparación —el propósito
-del panel— se vendría abajo. El color entra por otro lado: cada lectura tiene su
-tono de identidad, que viste su nombre, su borde y su barra.
+Sobre el color: **cada lectura tiene su propia rampa y su propio tono** —azul,
+naranja, verde, dorado, rosa, verde oscuro, violeta, rojo y un neutro para la
+edición manual—. Y las nueve comparten **la misma escalera de luminosidad**.
+
+Esa condición es la que sostiene el panel. Dar un color por matriz tiene un
+riesgo evidente: que el rojo de una signifique otra cosa que el azul de la
+vecina, y entonces compararlas deje de tener sentido. No ocurre porque solo
+cambia el tono: los ocho pasos de las nueve rampas coinciden en luminosidad con
+menos de 0,02 de diferencia, y la magnitud se lee por claridad, que es el canal
+con el que de hecho se lee. Una casilla oscura significa lo mismo en las nueve.
+
+Las rampas se generan en OKLCH: se fija la luminosidad de cada paso, se toma el
+ángulo de tono de la lectura y se sube el croma hasta donde llega el gamut. Cada
+modo, claro y oscuro, tiene su propia escalera, elegida contra su superficie; no
+es un volteo automático.
 
 Los nueve tonos de identidad se validaron con las seis comprobaciones del método
 —banda de luminosidad, suelo de croma, separación bajo daltonismo protán y
 deután, visión normal y contraste—. Los colores del informe de escritorio no
 pasan: teal y morado quedan a ΔE 2,3 bajo daltonismo y los dos dorados a 10,3
-incluso con visión normal, así que no se copiaron. Cada modo, claro y oscuro,
-tiene su propia serie elegida contra su superficie; no es un volteo automático.
+incluso con visión normal, así que no se copiaron.
 
 **9 · Operacional.** El capítulo 5, en vivo. Eliges origen `X` y destino `Y`
 —el par canónico o dos motivos tuyos de la biblioteca— y calculas la trayectoria
@@ -273,6 +282,12 @@ python3 herramientas/versionar.py 7
 Cambia la versión en los cuatro sitios donde tiene que coincidir: `VERSION` en
 `sw.js`, las consultas `?v=` de `styles.css` y `app.js` en `index.html`, la del
 worker en `app.js`, y las de `RECURSOS` en `sw.js`.
+
+El `index.html` es el único archivo que no puede llevar versión en su URL —es la
+puerta de entrada—, así que el service worker lo pide **siempre a la red** y solo
+tira de la copia guardada si no hay conexión o si tarda más de tres segundos. Sin
+eso, un navegador podía servir un `index.html` viejo que pedía un `app.js` que ya
+no existía.
 
 Hacerlo a mano en uno solo produce un fallo desagradable y difícil de leer: el
 navegador se trae el `index.html` nuevo y reutiliza de su caché HTTP el `app.js`

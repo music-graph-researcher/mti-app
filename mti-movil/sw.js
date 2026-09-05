@@ -8,16 +8,16 @@
 
 // Subir este número en cada publicación: la caché es «primero lo guardado»,
 // así que sin cambiarlo un móvil que ya tenga la app seguiría con la anterior.
-const VERSION = "mti-movil-v8";
+const VERSION = "mti-movil-v10";
 const CACHE_APP = `${VERSION}-app`;
 const CACHE_MOTOR = `${VERSION}-motor`;
 
 const RECURSOS = [
   "./",
   "index.html",
-  "styles.css?v=8",
-  "app.js?v=8",
-  "worker.js?v=8",
+  "styles.css?v=10",
+  "app.js?v=10",
+  "worker.js?v=10",
   "manifest.webmanifest",
   "iconos/icono.svg",
   "py/mti_bridge.py",
@@ -82,9 +82,38 @@ self.addEventListener("fetch", (evento) => {
   const url = new URL(peticion.url);
 
   if (url.origin !== self.location.origin) return;
+
+  // El documento va primero a la red. Es el único archivo que no puede llevar
+  // versión en su URL, así que con caché primero un navegador podía servir un
+  // index.html viejo que pedía un app.js que ya no existía. Con red primero eso
+  // no ocurre, y sin red se sirve el guardado, que es lo que sostiene el modo
+  // avión.
+  if (peticion.mode === "navigate") {
+    evento.respondWith(redAntes(peticion));
+    return;
+  }
+
   const esMotor = url.pathname.includes("/vendor/pyodide/");
   evento.respondWith(cacheAntes(peticion, esMotor ? CACHE_MOTOR : CACHE_APP));
 });
+
+async function redAntes(peticion) {
+  const cache = await caches.open(CACHE_APP);
+  try {
+    // Con red lenta no se espera indefinidamente: a los tres segundos se abre
+    // con lo guardado, que es preferible a una pantalla en blanco.
+    const respuesta = await Promise.race([
+      fetch(peticion),
+      new Promise((_, fallo) => setTimeout(() => fallo(new Error("lenta")), 3000)),
+    ]);
+    if (respuesta && respuesta.ok) cache.put(peticion, respuesta.clone());
+    return respuesta;
+  } catch (error) {
+    const guardado = (await cache.match(peticion)) || (await cache.match("index.html"));
+    if (guardado) return guardado;
+    throw error;
+  }
+}
 
 async function cacheAntes(peticion, nombreCache) {
   const cache = await caches.open(nombreCache);

@@ -34,7 +34,7 @@ const motor = (() => {
   let siguiente = 0;
 
   function crear() {
-    worker = new Worker("worker.js?v=8", { type: "module" });
+    worker = new Worker("worker.js?v=10", { type: "module" });
     worker.onmessage = ({ data }) => {
       if (data.tipo === "motor") {
         pintarEstadoMotor(data.estado, data.texto);
@@ -1170,30 +1170,50 @@ function pintarContextual(datos) {
 
 const cuadricula = { datos: null, lectura: 0, sector: null, par: null };
 
-/* Rampa secuencial de un solo tono, en ocho pasos.
+/* Nueve rampas, una por lectura, cada una con su tono.
  *
- * Un solo tono no es austeridad: es lo que permite comparar las nueve matrices
- * entre sí. Si cada lectura tuviera su propia gama, dos casillas del mismo color
- * en matrices distintas ya no significarían lo mismo, y la comparación —que es
- * el propósito del panel— se vendría abajo.
+ * El riesgo de dar un color a cada matriz es perder la comparación entre ellas:
+ * si el rojo de una significara otra cosa que el azul de la vecina, el panel
+ * dejaría de servir para lo que existe. Aquí no ocurre, y por una razón
+ * concreta: **las nueve rampas comparten la misma escalera de luminosidad**.
+ * Solo cambia el tono. La magnitud se lee por claridad —que es el canal con el
+ * que de hecho se lee—, así que una casilla oscura significa lo mismo en las
+ * nueve, sea del color que sea.
  *
- * El color entra por otro lado: cada lectura tiene su tono de identidad, que
- * viste su nombre y su barra. Ahí sí es categórico y ahí sí procede.
- *
- * Los pasos suben de croma hacia el centro (0,01 → 0,13) y bajan de luminosidad
- * de forma monótona, comprobado paso a paso. Cada modo tiene su propia serie,
- * elegida contra su superficie, no un volteo automático de la otra.
+ * Generadas en OKLCH: para cada paso se fija la luminosidad, se toma el ángulo
+ * de tono de la lectura y se sube el croma hasta donde llega el gamut. Los ocho
+ * pasos de las nueve rampas coinciden en luminosidad con menos de 0,02 de
+ * diferencia, comprobado.
  */
-const RAMPA = {
-  claro: ["#fbf7ef", "#f4e3bd", "#eac886", "#dba951", "#c4862c", "#a4651c", "#7f4715", "#5a2f12"],
-  oscuro: ["#1d1a15", "#33260f", "#4d3812", "#6d4f16", "#94701f", "#bb9235", "#dab55e", "#f0d392"],
+const RAMPAS = {
+  claro: [
+    ["#f3f8fe", "#d5e6fd", "#afd0fb", "#81b5f9", "#4795f7", "#1a74d9", "#1156a3", "#083b73"],
+    ["#fef5f2", "#fdddd1", "#fbbca5", "#fa936e", "#ee6329", "#c04c19", "#903710", "#662408"],
+    ["#f2faf5", "#c9efdb", "#97dfbb", "#5bcb9a", "#29ae7b", "#1f8a61", "#146747", "#0b4730"],
+    ["#fcf7ef", "#fbe0bc", "#f4c47f", "#e7a333", "#c28823", "#9b6b1a", "#744f11", "#513608"],
+    ["#fdf5f7", "#fddae5", "#fbb6cd", "#f28fb3", "#db6995", "#bc4376", "#932758", "#68183c"],
+    ["#f3faf2", "#cef0ca", "#a1e09b", "#70cc69", "#3cb037", "#1e8e1b", "#146a11", "#0b4909"],
+    ["#f6f7fe", "#e1e2fd", "#c6c7fb", "#a9a8f9", "#8a83f7", "#6c5de0", "#503fb4", "#372a80"],
+    ["#fef5f4", "#fddcd8", "#fbbab4", "#fa9089", "#f85351", "#d5232e", "#a11720", "#720d14"],
+    ["#f8f7f6", "#e7e4de", "#d2ccc1", "#b9b1a2", "#9c9482", "#7e7562", "#5e5646", "#413b2f"],
+  ],
+  oscuro: [
+    ["#171b20", "#142943", "#0e3c70", "#10549e", "#1d75d7", "#4f9af7", "#8ebdfa", "#bed9fc"],
+    ["#1f1916", "#401d10", "#662408", "#8e350f", "#c24b1a", "#f86325", "#fa9f80", "#fcc9b7"],
+    ["#171c19", "#112f22", "#0b4731", "#146447", "#1f8b63", "#2bb281", "#57d5a1", "#92edc2"],
+    ["#1d1a15", "#372409", "#523508", "#724c10", "#9d6b1a", "#ca8a25", "#f3a935", "#fccd91"],
+    ["#1f181a", "#3f1b27", "#661d39", "#932150", "#c53970", "#f45892", "#fa98b5", "#fcc5d4"],
+    ["#171c17", "#143012", "#0b4a09", "#136711", "#1f8f1b", "#32b72d", "#66d760", "#9aef93"],
+    ["#1a1a1f", "#272440", "#3a3369", "#524698", "#7264cb", "#9486f7", "#b5b0fa", "#d3d1fc"],
+    ["#1f1818", "#3f1c1c", "#672123", "#94292e", "#c64247", "#f56163", "#fa9c99", "#fcc7c4"],
+    ["#1b1a1a", "#2a2824", "#403b34", "#5b5448", "#7e7567", "#a19887", "#c2b9a9", "#dcd5c9"],
+  ],
 };
 
-/* Identidad de cada lectura. Ocho tonos validados —banda de luminosidad, suelo
- * de croma, separación para daltonismo protán y deután, y visión normal— más un
- * neutro para la novena, que es la referencia anotada a mano.
- * El nombre siempre acompaña al color, así que la identidad nunca depende del
- * color a solas. */
+/* Identidad de cada lectura, para el nombre, el borde y la barra. Ocho tonos
+ * validados —banda de luminosidad, suelo de croma, separación bajo daltonismo
+ * protán y deután, visión normal y contraste— más un neutro para la novena, que
+ * es la referencia anotada a mano. El nombre siempre acompaña al color. */
 const TONOS_LECTURA = {
   claro: ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948", "#7d7565"],
   oscuro: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767", "#8b8375"],
@@ -1207,9 +1227,10 @@ function colorLectura(indice) {
   return tonos[indice] || tonos[tonos.length - 1];
 }
 
-function colorDistancia(v, apagado) {
+function colorDistancia(v, apagado, lectura = 0) {
   if (v === null || v === undefined) return "rgba(0,0,0,0)";
-  const pasos = RAMPA[modoOscuro() ? "oscuro" : "claro"];
+  const conjunto = RAMPAS[modoOscuro() ? "oscuro" : "claro"];
+  const pasos = conjunto[lectura] || conjunto[0];
   const k = Math.max(0, Math.min(1, v)) * (pasos.length - 1);
   const i = Math.min(pasos.length - 2, Math.floor(k));
   const f = k - i;
@@ -1226,7 +1247,7 @@ function paresVisibles() {
   return sec.map((lista) => lista.includes(cuadricula.sector));
 }
 
-function dibujarMatriz(lienzo, matriz, ladoCss, conRejilla) {
+function dibujarMatriz(lienzo, matriz, ladoCss, conRejilla, lectura = 0) {
   const n = matriz.length;
   const dpr = window.devicePixelRatio || 1;
   lienzo.width = Math.round(ladoCss * dpr);
@@ -1243,7 +1264,7 @@ function dibujarMatriz(lienzo, matriz, ladoCss, conRejilla) {
       const apagado = dentro ? !(dentro[i] && dentro[j]) : false;
       ctx.fillStyle = i === j
         ? getComputedStyle(document.body).getPropertyValue("--linea").trim()
-        : colorDistancia(matriz[i][j], apagado);
+        : colorDistancia(matriz[i][j], apagado, lectura);
       ctx.fillRect(j * celda, i * celda, Math.ceil(celda), Math.ceil(celda));
     }
   }
@@ -1273,11 +1294,12 @@ function redibujarCuadricula() {
   if (!d) return;
   $$("#cl-miniaturas canvas").forEach((lienzo) => {
     const lado = lienzo.parentElement.clientWidth - 12;
-    if (lado > 0) dibujarMatriz(lienzo, d.lecturas[Number(lienzo.dataset.mini)].matriz, lado, false);
+    const n = Number(lienzo.dataset.mini);
+    if (lado > 0) dibujarMatriz(lienzo, d.lecturas[n].matriz, lado, false, n);
   });
   const grande = $("#cl-lienzo");
   const lado = grande.parentElement.clientWidth - 20;
-  if (lado > 0) dibujarMatriz(grande, d.lecturas[cuadricula.lectura].matriz, lado, true);
+  if (lado > 0) dibujarMatriz(grande, d.lecturas[cuadricula.lectura].matriz, lado, true, cuadricula.lectura);
 }
 
 async function pintarCuadricula() {
@@ -1319,7 +1341,8 @@ async function pintarCuadricula() {
 
   const l = d.lecturas[cuadricula.lectura];
   $("#cl-degradado").style.background =
-    `linear-gradient(90deg, ${colorDistancia(0)}, ${colorDistancia(0.5)}, ${colorDistancia(1)})`;
+    `linear-gradient(90deg, ${colorDistancia(0, false, cuadricula.lectura)}, ` +
+    `${colorDistancia(0.5, false, cuadricula.lectura)}, ${colorDistancia(1, false, cuadricula.lectura)})`;
   $("#cl-pie").innerHTML =
     `<b style="color:${colorLectura(cuadricula.lectura)}">${l.nombre}</b> — ${l.descripcion}. Media de la lectura: ${l["global"].toFixed(3)}.
      Cada casilla es un par de obras; la diagonal es cada obra consigo misma.`;
