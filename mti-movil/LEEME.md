@@ -92,6 +92,22 @@ con su valor y su puesto entre los trescientos.
 
 Los datos salen del propio informe de escritorio; no se recalcula nada.
 
+Al tocar una casilla, el rótulo bajo la cuadrícula nombra las dos obras con el
+valor y el puesto de esa lectura, y el bloque de abajo despliega las nueve.
+
+Sobre el color: las nueve matrices comparten **una sola rampa de un tono**, y es
+deliberado. Si cada lectura tuviera su gama, dos casillas del mismo color en
+matrices distintas dejarían de significar lo mismo y la comparación —el propósito
+del panel— se vendría abajo. El color entra por otro lado: cada lectura tiene su
+tono de identidad, que viste su nombre, su borde y su barra.
+
+Los nueve tonos de identidad se validaron con las seis comprobaciones del método
+—banda de luminosidad, suelo de croma, separación bajo daltonismo protán y
+deután, visión normal y contraste—. Los colores del informe de escritorio no
+pasan: teal y morado quedan a ΔE 2,3 bajo daltonismo y los dos dorados a 10,3
+incluso con visión normal, así que no se copiaron. Cada modo, claro y oscuro,
+tiene su propia serie elegida contra su superficie; no es un volteo automático.
+
 **9 · Operacional.** El capítulo 5, en vivo. Eliges origen `X` y destino `Y`
 —el par canónico o dos motivos tuyos de la biblioteca— y calculas la trayectoria
 con su contraste §5.9.1, el testigo constructivo de alcanzabilidad, el multigrafo

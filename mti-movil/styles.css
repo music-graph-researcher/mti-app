@@ -386,16 +386,28 @@ td.neg { color: var(--alerta); }
   border: 1px solid var(--linea); border-radius: 8px; background: var(--papel);
   padding: 6px; cursor: pointer; display: grid; gap: 5px; text-align: center;
 }
-.mini[aria-pressed="true"] { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento) inset; }
+.mini[aria-pressed="true"] { border-color: var(--tono); box-shadow: 0 0 0 1px var(--tono) inset; }
+.mini span { border-top: 2px solid var(--tono); padding-top: 4px; }
 .mini canvas { display: block; width: 100%; height: auto; border-radius: 3px; }
 .mini span { font-size: 9.5px; color: var(--tinta-3); line-height: 1.25; }
 .mini[aria-pressed="true"] span { color: var(--tinta); font-weight: 600; }
+.par-punto { flex: none; width: 8px; height: 8px; border-radius: 50%; }
 
 .lienzo-caja {
   border: 1px solid var(--linea); border-radius: var(--radio); background: var(--papel);
   padding: 10px; box-shadow: var(--sombra);
 }
 #cl-lienzo { display: block; width: 100%; height: auto; touch-action: manipulation; }
+
+.toque {
+  margin-top: 9px; padding: 10px 12px; border-radius: 9px;
+  background: var(--fondo); border: 1px solid var(--linea);
+  display: grid; gap: 3px;
+}
+.toque .obras { font: 600 13.5px/1.4 var(--sans); color: var(--tinta); }
+.toque .obras i { font-style: normal; color: var(--tinta-3); font-weight: 400; padding: 0 3px; }
+.toque .dato { font-size: 11.5px; color: var(--tinta-3); }
+.toque .dato b { font-family: var(--mono); font-size: 12px; }
 
 .escala { display: flex; align-items: center; gap: 9px; margin-top: 10px; font-size: 10.5px; color: var(--tinta-3); }
 .escala i { flex: 1; height: 7px; border-radius: 4px; display: block; }

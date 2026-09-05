@@ -34,7 +34,7 @@ const motor = (() => {
   let siguiente = 0;
 
   function crear() {
-    worker = new Worker("worker.js?v=7", { type: "module" });
+    worker = new Worker("worker.js?v=8", { type: "module" });
     worker.onmessage = ({ data }) => {
       if (data.tipo === "motor") {
         pintarEstadoMotor(data.estado, data.texto);
@@ -1170,13 +1170,52 @@ function pintarContextual(datos) {
 
 const cuadricula = { datos: null, lectura: 0, sector: null, par: null };
 
-// Rampa de un solo tono: claro = obras idénticas, oscuro = lo más distinto.
-// Un solo tono evita sugerir categorías donde solo hay un continuo.
+/* Rampa secuencial de un solo tono, en ocho pasos.
+ *
+ * Un solo tono no es austeridad: es lo que permite comparar las nueve matrices
+ * entre sí. Si cada lectura tuviera su propia gama, dos casillas del mismo color
+ * en matrices distintas ya no significarían lo mismo, y la comparación —que es
+ * el propósito del panel— se vendría abajo.
+ *
+ * El color entra por otro lado: cada lectura tiene su tono de identidad, que
+ * viste su nombre y su barra. Ahí sí es categórico y ahí sí procede.
+ *
+ * Los pasos suben de croma hacia el centro (0,01 → 0,13) y bajan de luminosidad
+ * de forma monótona, comprobado paso a paso. Cada modo tiene su propia serie,
+ * elegida contra su superficie, no un volteo automático de la otra.
+ */
+const RAMPA = {
+  claro: ["#fbf7ef", "#f4e3bd", "#eac886", "#dba951", "#c4862c", "#a4651c", "#7f4715", "#5a2f12"],
+  oscuro: ["#1d1a15", "#33260f", "#4d3812", "#6d4f16", "#94701f", "#bb9235", "#dab55e", "#f0d392"],
+};
+
+/* Identidad de cada lectura. Ocho tonos validados —banda de luminosidad, suelo
+ * de croma, separación para daltonismo protán y deután, y visión normal— más un
+ * neutro para la novena, que es la referencia anotada a mano.
+ * El nombre siempre acompaña al color, así que la identidad nunca depende del
+ * color a solas. */
+const TONOS_LECTURA = {
+  claro: ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948", "#7d7565"],
+  oscuro: ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767", "#8b8375"],
+};
+
+const modoOscuro = () =>
+  window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+
+function colorLectura(indice) {
+  const tonos = TONOS_LECTURA[modoOscuro() ? "oscuro" : "claro"];
+  return tonos[indice] || tonos[tonos.length - 1];
+}
+
 function colorDistancia(v, apagado) {
   if (v === null || v === undefined) return "rgba(0,0,0,0)";
-  const k = Math.max(0, Math.min(1, v));
-  const claro = [247, 244, 236], oscuro = [90, 55, 22];
-  const c = claro.map((x, i) => Math.round(x + (oscuro[i] - x) * k));
+  const pasos = RAMPA[modoOscuro() ? "oscuro" : "claro"];
+  const k = Math.max(0, Math.min(1, v)) * (pasos.length - 1);
+  const i = Math.min(pasos.length - 2, Math.floor(k));
+  const f = k - i;
+  const hex = (s) => [1, 3, 5].map((p) => parseInt(s.slice(p, p + 2), 16));
+  const a = hex(pasos[i]), b = hex(pasos[i + 1]);
+  const c = a.map((x, n) => Math.round(x + (b[n] - x) * f));
   return `rgba(${c[0]},${c[1]},${c[2]},${apagado ? 0.12 : 1})`;
 }
 
@@ -1257,7 +1296,8 @@ async function pintarCuadricula() {
   // Miniaturas: las nueve lecturas a la vez, para comparar patrones de un vistazo
   if (!$("#cl-miniaturas").children.length) {
     $("#cl-miniaturas").innerHTML = d.lecturas.map((l, i) =>
-      `<button type="button" class="mini" data-i="${i}" aria-pressed="${i === cuadricula.lectura}">
+      `<button type="button" class="mini" data-i="${i}" aria-pressed="${i === cuadricula.lectura}"
+               style="--tono:${colorLectura(i)}">
          <canvas data-mini="${i}"></canvas><span>${l.nombre}</span>
        </button>`).join("");
     $$("#cl-miniaturas .mini").forEach((boton) => {
@@ -1267,8 +1307,13 @@ async function pintarCuadricula() {
       });
     });
   }
-  $$("#cl-miniaturas .mini").forEach((b) =>
-    b.setAttribute("aria-pressed", String(Number(b.dataset.i) === cuadricula.lectura)));
+  // El marcado se construye una vez, pero los tonos dependen del tema: hay que
+  // reponerlos en cada pintada o el modo oscuro se queda con los del claro.
+  $$("#cl-miniaturas .mini").forEach((b) => {
+    const i = Number(b.dataset.i);
+    b.setAttribute("aria-pressed", String(i === cuadricula.lectura));
+    b.style.setProperty("--tono", colorLectura(i));
+  });
 
   requestAnimationFrame(redibujarCuadricula);
 
@@ -1276,7 +1321,7 @@ async function pintarCuadricula() {
   $("#cl-degradado").style.background =
     `linear-gradient(90deg, ${colorDistancia(0)}, ${colorDistancia(0.5)}, ${colorDistancia(1)})`;
   $("#cl-pie").innerHTML =
-    `<b>${l.nombre}</b> — ${l.descripcion}. Media de la lectura: ${l["global"].toFixed(3)}.
+    `<b style="color:${colorLectura(cuadricula.lectura)}">${l.nombre}</b> — ${l.descripcion}. Media de la lectura: ${l["global"].toFixed(3)}.
      Cada casilla es un par de obras; la diagonal es cada obra consigo misma.`;
 
   // Sectores
@@ -1295,7 +1340,15 @@ async function pintarCuadricula() {
     });
   }
 
+  rotularToque();
   pintarPar();
+}
+
+if (window.matchMedia) {
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (cuadricula.datos) pintarCuadricula();
+    if (estado.notas.length) dibujarRollo();
+  });
 }
 
 if ("ResizeObserver" in window) {
@@ -1319,7 +1372,28 @@ $("#cl-lienzo").addEventListener("click", (e) => {
   if (i < 0 || j < 0 || i >= n || j >= n || i === j) return;
   cuadricula.par = [i, j];
   pintarCuadricula();
+  rotularToque();
 });
+
+/* El bloque con las nueve lecturas queda por debajo del pliegue, así que al
+   tocar una casilla parecía que no ocurría nada. Este rótulo va pegado a la
+   cuadrícula y nombra las dos obras en el sitio. */
+function rotularToque() {
+  const caja = $("#cl-toque");
+  const d = cuadricula.datos;
+  if (!d || !cuadricula.par) { caja.hidden = true; return; }
+  const [a, b] = cuadricula.par;
+  const l = d.lecturas[cuadricula.lectura];
+  const valor = l.matriz[a][b];
+  const puesto = l.puestos ? l.puestos[a][b] + 1 : null;
+  caja.hidden = false;
+  caja.innerHTML = `
+    <span class="obras">${d.obras[a]}<i>·</i>${d.obras[b]}</span>
+    <span class="dato">
+      <span style="color:${colorLectura(cuadricula.lectura)}">${l.nombre}</span>:
+      <b>${valor.toFixed(3)}</b>${puesto ? ` · puesto ${puesto} de 300` : ""}
+    </span>`;
+}
 
 function pintarPar() {
   const d = cuadricula.datos;
@@ -1346,10 +1420,11 @@ function pintarPar() {
         : "No comparten ningún sector publicitario"}</small>
     </div>
     <div style="margin-top:12px">
-      ${filas.map((f) => `
+      ${filas.map((f, i) => `
         <div class="par-fila">
+          <span class="par-punto" style="background:${colorLectura(i)}"></span>
           <span class="par-nombre">${f.nombre}</span>
-          <span class="par-barra"><i style="width:${(f.valor * 100).toFixed(1)}%"></i></span>
+          <span class="par-barra"><i style="width:${(f.valor * 100).toFixed(1)}%;background:${colorLectura(i)}"></i></span>
           <span class="par-val">${f.valor.toFixed(3)}</span>
           <span class="par-puesto">${f.puesto !== null ? `${f.puesto + 1}/300` : ""}</span>
         </div>`).join("")}
