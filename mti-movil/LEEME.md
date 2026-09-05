@@ -83,7 +83,16 @@ Se muestran separadas y sin agregar, como exige el marco. Y se señala cuando un
 lectura no separa nada: fundamental, inversión y movimiento del bajo dejan los
 25 registros en una sola familia con silueta cero.
 
-**8 · Operacional.** El capítulo 5, en vivo. Eliges origen `X` y destino `Y`
+**8 · Cuadrícula.** La comparativa de las nueve lecturas del informe
+`similitudes-corpus-nueve-lecturas`: veinticinco obras, trescientos pares, nueve
+maneras de medirlos. Las nueve matrices en miniatura para comparar patrones de un
+vistazo, una grande para explorar con el dedo, y filtro por sector publicitario.
+Al tocar una casilla, ese par se muestra visto por las nueve lecturas a la vez,
+con su valor y su puesto entre los trescientos.
+
+Los datos salen del propio informe de escritorio; no se recalcula nada.
+
+**9 · Operacional.** El capítulo 5, en vivo. Eliges origen `X` y destino `Y`
 —el par canónico o dos motivos tuyos de la biblioteca— y calculas la trayectoria
 con su contraste §5.9.1, el testigo constructivo de alcanzabilidad, el multigrafo
 finito `G_R` dentro de una envolvente que controlas, y la comparación entre la
@@ -92,13 +101,13 @@ topología estructural y la operacional. El informe completo se puede descargar.
 Sin resúmenes con IA: `backend/ai_summaries.py` llama a un servicio externo y
 aquí está sustituido por un módulo inerte. El cálculo es idéntico.
 
-**9 · Jerarquía.** El capítulo 6, en vivo. Las diecinueve comprobaciones
+**10 · Jerarquía.** El capítulo 6, en vivo. Las diecinueve comprobaciones
 fundacionales de la transición `A₀→₁`, la constitución con su testigo de
 procedencia, el constructor de preimagen y la verificación de que el diagrama de
 elevación conmuta. En vez de teclear JSON, la configuración basal `Ξ₀` se
 construye a partir de un motivo analizado en la propia app.
 
-**10 · Validación.** La corrida `frozen` de E3–E6 sobre JKU-PDD: métricas
+**11 · Validación.** La corrida `frozen` de E3–E6 sobre JKU-PDD: métricas
 globales, los cinco pliegues con sus pesos seleccionados, las doce ablaciones
 con su delta frente al perfil completo, y la trazabilidad (commit, hashes,
 plataforma). Incluye el informe completo de la corrida.
@@ -107,6 +116,20 @@ De solo lectura, y a propósito: la validación necesita los 384 MB del corpus y
 multiproceso. Una corrida certificada se exhibe, no se rehace en un móvil. La
 app señala además que el árbol de trabajo tenía cambios sin confirmar, porque
 eso condiciona qué significa «reproducible».
+
+## Dos registros de lectura
+
+Arriba a la derecha hay un interruptor **En claro / Técnico**.
+
+En claro —que es el modo por defecto— cada pantalla lleva una explicación en
+lenguaje llano y se retira la letra pequeña con la notación. Es el modo pensado
+para enseñar la app a músicos, que es quien va a estar en un tribunal de
+musicología.
+
+Técnico devuelve todo: fracciones exactas, nombres de los descriptores,
+estatus métricos y las notas al pie. La elección se recuerda en el dispositivo.
+
+Nada cambia en el cálculo: es la misma cifra explicada de dos maneras.
 
 ## Qué no hace todavía
 
@@ -177,7 +200,8 @@ mti-movil/
 │   └── mticore/            copia literal de backend/ (no editar aquí)
 │                           salvo ai_summaries.py, que es un sustituto inerte
 ├── vendor/pyodide/         CPython 3 en WebAssembly (~13 MB)
-├── corpus/                 nice-dataset e informe 8001, ya calculados
+├── corpus/                 nice-dataset, informe 8001, extendido 8005
+│                           y la cuadrícula de las nueve lecturas
 ├── validacion/             corrida E3–E6 del 8004, de solo lectura
 ├── herramientas/           guiones que regeneran corpus/ y validacion/
 ├── ejemplos/               cuatro MIDIs de prueba
@@ -212,6 +236,15 @@ python3 ruta/a/mti-movil/herramientas/generar_extendido.py \
 ```
 
 Tarda 7 s y produce 122 KB.
+
+Y la cuadrícula comparativa, que se extrae del informe de escritorio:
+
+```bash
+python3 herramientas/generar_nueve_lecturas.py \
+    --html "ruta/al/similitudes-corpus-nueve-lecturas.html" --salida corpus
+```
+
+Son 79 KB. No recalcula: copia las cifras del informe.
 
 ## Al publicar una versión nueva
 

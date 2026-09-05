@@ -12,7 +12,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="iconos/icono.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="iconos/icono-180.png">
-<link rel="stylesheet" href="styles.css?v=6">
+<link rel="stylesheet" href="styles.css?v=7">
 </head>
 <body>
 
@@ -21,10 +21,14 @@
     <span class="sigla">MTI</span>
     <span class="lema">Marco Topológico Invariante</span>
   </div>
-  <button id="btn-motor" class="motor" type="button" aria-live="polite">
-    <span class="punto" data-estado="frio"></span>
-    <span id="motor-texto">Motor en reposo</span>
-  </button>
+  <div class="cabecera-acciones">
+    <button id="btn-modo" class="modo" type="button" aria-pressed="true"
+            title="Cambia entre explicación llana y notación técnica">En claro</button>
+    <button id="btn-motor" class="motor" type="button" aria-live="polite">
+      <span class="punto" data-estado="frio"></span>
+      <span id="motor-texto">Motor en reposo</span>
+    </button>
+  </div>
 </header>
 
 <nav class="pasos" id="pasos" aria-label="Pasos del análisis">
@@ -35,9 +39,10 @@
   <button type="button" class="paso" data-panel="p-biblioteca"><b>5</b> Biblioteca</button>
   <button type="button" class="paso" data-panel="p-corpus"><b>6</b> Corpus</button>
   <button type="button" class="paso" data-panel="p-extendido"><b>7</b> Extendido</button>
-  <button type="button" class="paso" data-panel="p-operacional"><b>8</b> Operacional</button>
-  <button type="button" class="paso" data-panel="p-jerarquia"><b>9</b> Jerarquía</button>
-  <button type="button" class="paso" data-panel="p-validacion"><b>10</b> Validación</button>
+  <button type="button" class="paso" data-panel="p-cuadricula"><b>8</b> Cuadrícula</button>
+  <button type="button" class="paso" data-panel="p-operacional"><b>9</b> Operacional</button>
+  <button type="button" class="paso" data-panel="p-jerarquia"><b>10</b> Jerarquía</button>
+  <button type="button" class="paso" data-panel="p-validacion"><b>11</b> Validación</button>
 </nav>
 
 <main>
@@ -145,6 +150,14 @@
 <!-- ═══════════ 4 · RESULTADO ═══════════ -->
 <section id="p-resultado" class="panel">
   <h1>Análisis MTI</h1>
+  <div class="enclaro">
+    <b>Qué estás viendo</b>
+    El programa ha convertido el fragmento en una figura: cada nota es un trazo
+    horizontal, colocado a la altura que le corresponde respecto de la tónica que
+    elegiste, y de la longitud que dura. La «firma» de abajo es esa figura escrita
+    como una secuencia de números, de modo que dos motivos con la misma forma
+    producen la misma firma aunque estén en distinto tono o vayan a otra velocidad.
+  </div>
   <div id="resultado-cargando" class="cargando" hidden>
     <div class="giro"></div>
     <p id="cargando-texto">Preparando el motor…</p>
@@ -156,7 +169,7 @@
 
     <h2>Grafo</h2>
     <div class="grafo-caja" id="grafo-caja"></div>
-    <p class="nota" id="grafo-nota"></p>
+    <p class="nota siempre" id="grafo-nota"></p>
 
     <h2>Firma canónica</h2>
     <div class="firma" id="firma"></div>
@@ -199,6 +212,14 @@
     La app no predice sectores ni clasifica: ordena distancias.
   </div>
 
+  <div class="enclaro">
+    <b>Qué se hizo aquí</b>
+    Se compararon las cincuenta versiones de todas las formas posibles —mil
+    doscientas veinticinco parejas— y se agruparon las que más se parecen. Después,
+    y solo después, se miró si los grupos coincidían con el sector del anuncio.
+    La respuesta corta es que no: la música no se agrupa por sector publicitario.
+  </div>
+
   <h2>Análisis de corpus, ya calculado</h2>
   <p class="nota">
     La matriz de 50×50, la jerarquía y las familias se calculan en el proyecto,
@@ -231,11 +252,53 @@
     <span class="mono">Dγ</span> en ningún escalar único.
   </div>
 
+  <div class="enclaro">
+    <b>Nueve maneras de mirar lo mismo</b>
+    Hasta ahora comparábamos los motivos entero contra entero. Aquí se mira una
+    cosa cada vez: solo el ritmo, solo el movimiento del bajo, solo los intervalos.
+    Cada mirada agrupa las obras a su manera.
+    <br><br>
+    El número grande de la derecha dice si los grupos salen bien separados: cerca
+    de cero, la agrupación no significa nada; cerca de uno, los grupos son nítidos.
+    La «pureza» hay que compararla con el 24 %, que es lo que saldría por puro azar.
+  </div>
+
   <div class="filtros" id="ext-texturas"></div>
   <div id="ext-lecturas"></div>
 </section>
 
-<!-- ═══════════ 8 · OPERACIONAL ═══════════ -->
+<!-- ═══════════ 8 · CUADRÍCULA ═══════════ -->
+<section id="p-cuadricula" class="panel">
+  <h1>Cuadrícula comparativa</h1>
+  <p class="intro">
+    Las mismas veinticinco obras, medidas de nueve maneras distintas.
+    Trescientos pares, nueve veces.
+  </p>
+
+  <div class="miniaturas" id="cl-miniaturas"></div>
+
+  <div class="lienzo-caja">
+    <canvas id="cl-lienzo"></canvas>
+  </div>
+  <div class="escala">
+    <span>0 · idénticas</span>
+    <i id="cl-degradado"></i>
+    <span>1 · lo más distinto</span>
+  </div>
+  <p class="nota siempre" id="cl-pie"></p>
+
+  <h2>Aislar un sector</h2>
+  <p class="nota">
+    Deja visibles solo los pares en que <b>las dos</b> obras se anuncian en ese
+    sector. Una obra puede pertenecer a varios.
+  </p>
+  <div class="filtros" id="cl-sectores"></div>
+
+  <h2>El par elegido</h2>
+  <div id="cl-detalle"><p class="nota">Toca cualquier casilla de la cuadrícula.</p></div>
+</section>
+
+<!-- ═══════════ 9 · OPERACIONAL ═══════════ -->
 <section id="p-operacional" class="panel">
   <h1>Topología operacional</h1>
   <p class="intro">
@@ -249,6 +312,14 @@
   <h2>Destino Y</h2>
   <div class="filtros" id="op-destino"></div>
   <div class="resumen-sel" id="op-estados"></div>
+
+  <div class="enclaro">
+    <b>De un motivo a otro, paso a paso</b>
+    En vez de preguntar «cuánto se parecen», aquí se pregunta «qué habría que
+    hacerle a este motivo para convertirlo en el otro»: subir una nota, alargar
+    otra, quitar una tercera. Cada operación cuesta, y la suma es una manera
+    distinta de medir la distancia entre los dos.
+  </div>
 
   <h2>Trayectoria y alcanzabilidad</h2>
   <p class="nota">
@@ -290,13 +361,20 @@
   </div>
 </section>
 
-<!-- ═══════════ 9 · JERARQUÍA ═══════════ -->
+<!-- ═══════════ 10 · JERARQUÍA ═══════════ -->
 <section id="p-jerarquia" class="panel">
   <h1>Jerarquía constitutiva</h1>
   <p class="intro">
     Marco tipado del capítulo 6. La transición evento → motivo
     <span class="mono">A₀→₁</span> está especificada; las superiores no.
   </p>
+
+  <div class="enclaro">
+    <b>De notas sueltas a motivo</b>
+    Un motivo no es una lista de notas: es lo que queda cuando se olvida el tono
+    concreto y la velocidad. Este apartado comprueba que ese paso —de las notas al
+    motivo— está bien definido y que no pierde el rastro de dónde vino cada cosa.
+  </div>
 
   <h2>Fundación 0 → 1</h2>
   <p class="nota">
@@ -368,6 +446,16 @@
   </div>
 
   <div id="val-cabecera"></div>
+
+  <div class="enclaro">
+    <b>¿Funciona de verdad?</b>
+    Se tomó un repertorio de ciento veintiuna ocurrencias con las familias ya
+    anotadas por especialistas, y se le preguntó al método: dado este motivo,
+    ¿cuáles son sus parientes? El <b>mAP</b> resume el acierto: 0,90 sobre 1
+    significa que casi siempre coloca a los parientes verdaderos en las primeras
+    posiciones. Y para que no fuera trampa, cada obra se evaluó con los ajustes
+    calculados sin haberla visto.
+  </div>
 
   <h2>Métricas globales</h2>
   <div class="cifras" id="val-metricas"></div>
@@ -443,6 +531,6 @@
 
 <div class="brindis" id="brindis" role="status" aria-live="polite" hidden></div>
 
-<script src="app.js?v=6"></script>
+<script src="app.js?v=7"></script>
 </body>
 </html>

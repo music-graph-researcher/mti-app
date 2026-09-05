@@ -8,16 +8,16 @@
 
 // Subir este número en cada publicación: la caché es «primero lo guardado»,
 // así que sin cambiarlo un móvil que ya tenga la app seguiría con la anterior.
-const VERSION = "mti-movil-v6";
+const VERSION = "mti-movil-v7";
 const CACHE_APP = `${VERSION}-app`;
 const CACHE_MOTOR = `${VERSION}-motor`;
 
 const RECURSOS = [
   "./",
   "index.html",
-  "styles.css?v=6",
-  "app.js?v=6",
-  "worker.js?v=6",
+  "styles.css?v=7",
+  "app.js?v=7",
+  "worker.js?v=7",
   "manifest.webmanifest",
   "iconos/icono.svg",
   "py/mti_bridge.py",
@@ -39,6 +39,7 @@ const RECURSOS = [
   "corpus/corpus.json",
   "corpus/informe.json",
   "corpus/extendido.json",
+  "corpus/nueve-lecturas.json",
   "validacion/informe.json",
   "validacion/resumen.md",
 ];

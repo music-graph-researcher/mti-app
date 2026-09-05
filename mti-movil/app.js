@@ -34,7 +34,7 @@ const motor = (() => {
   let siguiente = 0;
 
   function crear() {
-    worker = new Worker("worker.js?v=6", { type: "module" });
+    worker = new Worker("worker.js?v=7", { type: "module" });
     worker.onmessage = ({ data }) => {
       if (data.tipo === "motor") {
         pintarEstadoMotor(data.estado, data.texto);
@@ -145,6 +145,9 @@ function irA(idPanel) {
   if (idPanel === "p-fragmento" && estado.notas.length) {
     requestAnimationFrame(dibujarRollo);
   }
+  if (idPanel === "p-cuadricula" && cuadricula.datos) {
+    requestAnimationFrame(redibujarCuadricula);
+  }
 }
 
 function habilitarPaso(idPanel, habilitado = true) {
@@ -161,6 +164,7 @@ $$(".paso").forEach((boton) => {
     if (boton.dataset.panel === "p-extendido") pintarExtendido();
     if (boton.dataset.panel === "p-jerarquia") pintarJerarquia();
     if (boton.dataset.panel === "p-operacional") pintarOperacional();
+    if (boton.dataset.panel === "p-cuadricula") pintarCuadricula();
     irA(boton.dataset.panel);
   });
 });
@@ -708,6 +712,9 @@ async function pintarCercania(familia) {
             </div>
           </div>`).join("")}
       </div>
+      <p class="nota siempre">
+        Ordenado de más parecido a menos. La cifra va de 0, idénticos, a 1, lo más distinto.
+      </p>
       <p class="nota">
         Ordenado por índice relativo <span class="mono">D̄γ</span>, de 0 (idéntico) a 1.
         Los diez registros más próximos pertenecen a <b>${diezSectores.size}</b>
@@ -1157,6 +1164,203 @@ function pintarContextual(datos) {
     <div class="proc">
       ${filas.map(([etiqueta, , valor]) => `<div><span>${etiqueta}</span><span>${valor}</span></div>`).join("")}
     </div>`;
+}
+
+/* ══════════════════ Cuadrícula comparativa ══════════════════ */
+
+const cuadricula = { datos: null, lectura: 0, sector: null, par: null };
+
+// Rampa de un solo tono: claro = obras idénticas, oscuro = lo más distinto.
+// Un solo tono evita sugerir categorías donde solo hay un continuo.
+function colorDistancia(v, apagado) {
+  if (v === null || v === undefined) return "rgba(0,0,0,0)";
+  const k = Math.max(0, Math.min(1, v));
+  const claro = [247, 244, 236], oscuro = [90, 55, 22];
+  const c = claro.map((x, i) => Math.round(x + (oscuro[i] - x) * k));
+  return `rgba(${c[0]},${c[1]},${c[2]},${apagado ? 0.12 : 1})`;
+}
+
+function paresVisibles() {
+  // Un par cuenta si las dos obras comparten el sector aislado.
+  if (!cuadricula.sector) return null;
+  const sec = cuadricula.datos.sectores;
+  return sec.map((lista) => lista.includes(cuadricula.sector));
+}
+
+function dibujarMatriz(lienzo, matriz, ladoCss, conRejilla) {
+  const n = matriz.length;
+  const dpr = window.devicePixelRatio || 1;
+  lienzo.width = Math.round(ladoCss * dpr);
+  lienzo.height = Math.round(ladoCss * dpr);
+  lienzo.style.height = `${ladoCss}px`;
+  const ctx = lienzo.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, ladoCss, ladoCss);
+
+  const dentro = paresVisibles();
+  const celda = ladoCss / n;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      const apagado = dentro ? !(dentro[i] && dentro[j]) : false;
+      ctx.fillStyle = i === j
+        ? getComputedStyle(document.body).getPropertyValue("--linea").trim()
+        : colorDistancia(matriz[i][j], apagado);
+      ctx.fillRect(j * celda, i * celda, Math.ceil(celda), Math.ceil(celda));
+    }
+  }
+
+  if (conRejilla && celda > 6) {
+    ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue("--fondo").trim();
+    ctx.lineWidth = 0.5;
+    for (let k = 1; k < n; k++) {
+      ctx.beginPath(); ctx.moveTo(k * celda, 0); ctx.lineTo(k * celda, ladoCss); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, k * celda); ctx.lineTo(ladoCss, k * celda); ctx.stroke();
+    }
+  }
+
+  // La casilla elegida, marcada en las dos posiciones simétricas
+  if (cuadricula.par && conRejilla) {
+    const [a, b] = cuadricula.par;
+    ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue("--tinta").trim();
+    ctx.lineWidth = 2;
+    [[a, b], [b, a]].forEach(([i, j]) => {
+      ctx.strokeRect(j * celda + 1, i * celda + 1, celda - 2, celda - 2);
+    });
+  }
+}
+
+function redibujarCuadricula() {
+  const d = cuadricula.datos;
+  if (!d) return;
+  $$("#cl-miniaturas canvas").forEach((lienzo) => {
+    const lado = lienzo.parentElement.clientWidth - 12;
+    if (lado > 0) dibujarMatriz(lienzo, d.lecturas[Number(lienzo.dataset.mini)].matriz, lado, false);
+  });
+  const grande = $("#cl-lienzo");
+  const lado = grande.parentElement.clientWidth - 20;
+  if (lado > 0) dibujarMatriz(grande, d.lecturas[cuadricula.lectura].matriz, lado, true);
+}
+
+async function pintarCuadricula() {
+  if (!cuadricula.datos) {
+    try {
+      const respuesta = await fetch("corpus/nueve-lecturas.json");
+      if (!respuesta.ok) throw new Error(`HTTP ${respuesta.status}`);
+      cuadricula.datos = await respuesta.json();
+    } catch (error) {
+      $("#cl-pie").innerHTML = `No se pudo cargar la cuadrícula: ${error.message}`;
+      return;
+    }
+  }
+  const d = cuadricula.datos;
+
+  // Miniaturas: las nueve lecturas a la vez, para comparar patrones de un vistazo
+  if (!$("#cl-miniaturas").children.length) {
+    $("#cl-miniaturas").innerHTML = d.lecturas.map((l, i) =>
+      `<button type="button" class="mini" data-i="${i}" aria-pressed="${i === cuadricula.lectura}">
+         <canvas data-mini="${i}"></canvas><span>${l.nombre}</span>
+       </button>`).join("");
+    $$("#cl-miniaturas .mini").forEach((boton) => {
+      boton.addEventListener("click", () => {
+        cuadricula.lectura = Number(boton.dataset.i);
+        pintarCuadricula();
+      });
+    });
+  }
+  $$("#cl-miniaturas .mini").forEach((b) =>
+    b.setAttribute("aria-pressed", String(Number(b.dataset.i) === cuadricula.lectura)));
+
+  requestAnimationFrame(redibujarCuadricula);
+
+  const l = d.lecturas[cuadricula.lectura];
+  $("#cl-degradado").style.background =
+    `linear-gradient(90deg, ${colorDistancia(0)}, ${colorDistancia(0.5)}, ${colorDistancia(1)})`;
+  $("#cl-pie").innerHTML =
+    `<b>${l.nombre}</b> — ${l.descripcion}. Media de la lectura: ${l["global"].toFixed(3)}.
+     Cada casilla es un par de obras; la diagonal es cada obra consigo misma.`;
+
+  // Sectores
+  if (!$("#cl-sectores").children.length) {
+    const entradas = Object.entries(d.catalogo);
+    $("#cl-sectores").innerHTML =
+      `<button type="button" class="filtro" data-sec="" aria-pressed="true">todo el corpus</button>` +
+      entradas.map(([s, n]) => `<button type="button" class="filtro" data-sec="${s}" aria-pressed="false">${s} · ${n}</button>`).join("");
+    $$("#cl-sectores .filtro").forEach((boton) => {
+      boton.addEventListener("click", () => {
+        cuadricula.sector = boton.dataset.sec || null;
+        $$("#cl-sectores .filtro").forEach((b) =>
+          b.setAttribute("aria-pressed", String((b.dataset.sec || null) === cuadricula.sector)));
+        pintarCuadricula();
+      });
+    });
+  }
+
+  pintarPar();
+}
+
+if ("ResizeObserver" in window) {
+  let anchoPrevio = 0;
+  new ResizeObserver(() => {
+    const ancho = $("#cl-lienzo").clientWidth;
+    if (ancho && ancho !== anchoPrevio && cuadricula.datos) {
+      anchoPrevio = ancho;
+      redibujarCuadricula();
+    }
+  }).observe($("#cl-lienzo"));
+}
+
+$("#cl-lienzo").addEventListener("click", (e) => {
+  const d = cuadricula.datos;
+  if (!d) return;
+  const caja = e.currentTarget.getBoundingClientRect();
+  const n = d.obras.length;
+  const j = Math.floor(((e.clientX - caja.left) / caja.width) * n);
+  const i = Math.floor(((e.clientY - caja.top) / caja.height) * n);
+  if (i < 0 || j < 0 || i >= n || j >= n || i === j) return;
+  cuadricula.par = [i, j];
+  pintarCuadricula();
+});
+
+function pintarPar() {
+  const d = cuadricula.datos;
+  const caja = $("#cl-detalle");
+  if (!cuadricula.par) return;
+  const [a, b] = cuadricula.par;
+
+  // El interés del panel: el mismo par visto por las nueve lecturas a la vez
+  const filas = d.lecturas.map((l) => ({
+    nombre: l.nombre,
+    valor: l.matriz[a][b],
+    puesto: l.puestos ? l.puestos[a][b] : null,
+  }));
+  const masCerca = filas.reduce((x, y) => (y.valor < x.valor ? y : x));
+  const masLejos = filas.reduce((x, y) => (y.valor > x.valor ? y : x));
+
+  const compartidos = d.sectores[a].filter((s) => d.sectores[b].includes(s));
+
+  caja.innerHTML = `
+    <div class="par-cab">
+      <b>${d.obras[a]} · ${d.obras[b]}</b>
+      <small>${compartidos.length
+        ? `Comparten ${compartidos.length} sector(es): ${compartidos.join(", ")}`
+        : "No comparten ningún sector publicitario"}</small>
+    </div>
+    <div style="margin-top:12px">
+      ${filas.map((f) => `
+        <div class="par-fila">
+          <span class="par-nombre">${f.nombre}</span>
+          <span class="par-barra"><i style="width:${(f.valor * 100).toFixed(1)}%"></i></span>
+          <span class="par-val">${f.valor.toFixed(3)}</span>
+          <span class="par-puesto">${f.puesto !== null ? `${f.puesto + 1}/300` : ""}</span>
+        </div>`).join("")}
+    </div>
+    <p class="nota">
+      Este par es lo más parecido para <b>${masCerca.nombre}</b> (${masCerca.valor.toFixed(3)})
+      y lo más distinto para <b>${masLejos.nombre}</b> (${masLejos.valor.toFixed(3)}).
+      El número de la derecha es el puesto del par entre los trescientos de esa
+      lectura: la barra sitúa el valor dentro de su propia matriz, así que una
+      barra corta significa «próximo para esta lectura», no «próximo en absoluto».
+    </p>`;
 }
 
 /* ══════════════════ Topología operacional ══════════════════ */
@@ -1794,7 +1998,36 @@ $("#btn-offline").addEventListener("click", async () => {
   }
 });
 
+/* ══════════════════ Modo de lectura ══════════════════ */
+
+/* Dos registros para el mismo contenido. «En claro» es el de por defecto porque
+   la app está pensada para enseñarse a músicos, no a topólogos: retira la letra
+   pequeña y deja las glosas. «Técnico» devuelve la notación completa, que es la
+   que hace falta si alguien del tribunal quiere el detalle. */
+
+const CLAVE_MODO = "mti-movil-modo";
+
+function fijarModo(modo) {
+  document.body.dataset.modo = modo;
+  const boton = $("#btn-modo");
+  boton.setAttribute("aria-pressed", String(modo === "claro"));
+  boton.textContent = modo === "claro" ? "En claro" : "Técnico";
+  try { localStorage.setItem(CLAVE_MODO, modo); } catch { /* modo privado */ }
+}
+
+$("#btn-modo").addEventListener("click", () => {
+  const actual = document.body.dataset.modo === "claro" ? "tecnico" : "claro";
+  fijarModo(actual);
+  brindis(actual === "claro"
+    ? "Explicación llana: se oculta la letra pequeña"
+    : "Notación técnica completa");
+});
+
 /* ══════════════════ Arranque ══════════════════ */
+
+let modoGuardado = "claro";
+try { modoGuardado = localStorage.getItem(CLAVE_MODO) || "claro"; } catch { /* modo privado */ }
+fijarModo(modoGuardado);
 
 pintarTeclas();
 fijarTonica(60);
