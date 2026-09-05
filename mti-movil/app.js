@@ -34,7 +34,7 @@ const motor = (() => {
   let siguiente = 0;
 
   function crear() {
-    worker = new Worker("worker.js?v=10", { type: "module" });
+    worker = new Worker("worker.js?v=11", { type: "module" });
     worker.onmessage = ({ data }) => {
       if (data.tipo === "motor") {
         pintarEstadoMotor(data.estado, data.texto);
@@ -723,7 +723,7 @@ async function pintarCercania(familia) {
       <div class="aviso suave">
         <b>Esto es proximidad, no clasificación</b>
         El sector es una etiqueta externa que no interviene en <span class="mono">Dγ</span>.
-        Con 25 obras en 15 categorías, seis de ellas con una sola obra, ninguna
+        Con 25 obras en 15 categorías, diez de ellas con una sola obra, ninguna
         lectura clasificatoria se sostiene.
       </div>`;
   } catch (error) {
@@ -1408,7 +1408,8 @@ function rotularToque() {
   const [a, b] = cuadricula.par;
   const l = d.lecturas[cuadricula.lectura];
   const valor = l.matriz[a][b];
-  const puesto = l.puestos ? l.puestos[a][b] + 1 : null;
+  // En el informe el puesto ya va de 1 a 300 (la diagonal vale 0): no se suma nada.
+  const puesto = l.puestos && l.puestos[a][b] > 0 ? l.puestos[a][b] : null;
   caja.hidden = false;
   caja.innerHTML = `
     <span class="obras">${d.obras[a]}<i>·</i>${d.obras[b]}</span>
@@ -1449,7 +1450,7 @@ function pintarPar() {
           <span class="par-nombre">${f.nombre}</span>
           <span class="par-barra"><i style="width:${(f.valor * 100).toFixed(1)}%;background:${colorLectura(i)}"></i></span>
           <span class="par-val">${f.valor.toFixed(3)}</span>
-          <span class="par-puesto">${f.puesto !== null ? `${f.puesto + 1}/300` : ""}</span>
+          <span class="par-puesto">${f.puesto ? `${f.puesto}/300` : ""}</span>
         </div>`).join("")}
     </div>
     <p class="nota">
@@ -1873,9 +1874,11 @@ async function pintarExtendido() {
 
   $("#ext-lecturas").innerHTML = bloque.lecturas.map((l) => {
     const sil = l.silueta;
-    const tamanos = l.familias.map((f) => f.miembros.length);
+    const tamanos = l.familias.map((f) => f.tamano);
+    const per = l.persistencia || {};
     // Una sola familia con todo dentro significa que esa lectura no separa nada.
     const plana = l.familias.length < 2;
+    const pond = l.pureza_ponderada;
     return `
       <details class="lectura">
         <summary>
@@ -1885,41 +1888,47 @@ async function pintarExtendido() {
           </div>
           <div class="lectura-meta">
             <span class="pastilla${plana ? " plana" : ""}">${l.familias.length} familia(s)${tamanos.length ? " · " + tamanos.join("+") : ""}</span>
-            <span class="pastilla">pureza ${l.pureza === null ? "—" : (l.pureza * 100).toFixed(1) + " %"}</span>
-            <span class="pastilla">H0 ${l.H0} · H1 ${l.H1}</span>
+            <span class="pastilla">pureza ${pond === null || pond === undefined ? "—" : (pond * 100).toFixed(0) + " %"}</span>
+            <span class="pastilla">H1 ${per.H1 ?? "—"}${per.H1_max ? ` · máx ${Number(per.H1_max).toFixed(2)}` : ""}</span>
           </div>
           <div class="barra-sil"><i style="width:${Math.max(0, Math.min(1, sil || 0)) * 100}%"></i></div>
         </summary>
         <div class="lectura-cuerpo">
           ${plana
-            ? `<p class="nota">Esta lectura no separa el corpus: los ${tamanos[0] || 0} registros
+            ? `<p class="nota siempre">Esta lectura no separa el corpus: los ${tamanos[0] || 0} registros
                  caen en una sola familia y la silueta es cero. El componente no
                  discrimina en este material.</p>`
             : ""}
           <div class="familia-lista">
             ${l.familias.map((f) => `
               <div class="familia-bloque">
-                <b>${f.id || "familia"} · ${f.miembros.length} registro(s)</b>
-                <p>${f.miembros.map((m) => `${obras[m] || m}<span class="nota"> (${sectores[m] || "sin sector"})</span>`).join(" · ")}</p>
+                <b>${f.id || "familia"} · ${f.tamano} registro(s)${f.dominante ? ` · ${f.dominante} ${f.pureza !== null && f.pureza !== undefined ? (f.pureza * 100).toFixed(0) + " %" : ""}` : ""}</b>
+                <p>${f.miembros.map((m) => `${obras[m] || m}<span class="nota siempre"> (${sectores[m] || "sin sector"})</span>`).join(" · ")}</p>
               </div>`).join("")}
           </div>
+          <p class="nota siempre">
+            Homología persistente: H0 ${per.H0 ?? "—"} intervalos, H1 ${per.H1 ?? "—"} positivo(s)${per.H1_max ? `, persistencia máxima ${Number(per.H1_max).toFixed(3)}` : ""}.
+          </p>
           ${l.medoide && l.medoide.obra
-            ? `<p class="nota"><b>Forma central</b> (medoide): ${l.medoide.obra}${l.medoide.compositor ? ` — ${l.medoide.compositor}` : ""}.</p>`
+            ? `<p class="nota siempre"><b>Forma central</b> (medoide): ${l.medoide.obra}${l.medoide.compositor ? ` — ${l.medoide.compositor}` : ""}.</p>`
             : ""}
         </div>
       </details>`;
   }).join("") + `
-    <div class="aviso suave">
-      <b>Homología persistente vacía</b>
-      Las diecisiete lecturas devuelven H0 y H1 sin rasgos con los parámetros de
-      selección por defecto. Es un resultado, no un fallo: conviene poder
-      explicarlo.
-    </div>
+    <p class="nota siempre">
+      La <b>pureza</b> de cada familia es la fracción de sus miembros que comparte el
+      sector dominante, tal como la define el proyecto. La cifra de cada tarjeta es la
+      pureza ponderada por el tamaño de las familias —la media simple engañaría, porque
+      una familia de un solo miembro es pura al 100 % por definición—. Se mide
+      <b>después</b> de agrupar: la etiqueta no interviene en ninguna distancia.
+      Con «automoción» siendo el 24 % del corpus, una pureza cercana a esa cifra
+      equivale a no separar nada.
+    </p>
     <p class="nota">
-      La pureza mide cuánto coincide cada familia con la etiqueta publicitaria,
-      medida <b>después</b> de agrupar. La etiqueta no interviene en ninguna
-      distancia. Con «automoción» siendo el 24 % del corpus, una pureza cercana
-      a esa cifra equivale a no separar nada.
+      En la homología persistente, H0 cuenta 25 intervalos en todas las lecturas: con
+      25 registros, cada uno nace como componente propio y van fundiéndose al crecer la
+      escala. H1 son los ciclos con persistencia positiva; las lecturas que no separan
+      familias tampoco producen ninguno.
     </p>`;
 }
 

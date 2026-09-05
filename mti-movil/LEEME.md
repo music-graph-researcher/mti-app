@@ -76,8 +76,10 @@ distancias; no clasifica ni predice sectores, y lo dice en pantalla.
 
 **7 · Extendido.** Las lecturas comparativas del §3.6 sobre el mismo corpus:
 nueve en textura armónica y ocho en melódica —no hay movimiento del bajo en una
-línea sola—. Cada lectura con su silueta, sus familias, su pureza respecto de la
-etiqueta publicitaria, su homología persistente y su medoide o «forma central».
+línea sola—. Cada lectura con su silueta, sus familias con la pureza que define el
+proyecto —fracción de miembros que comparte el sector dominante—, una pureza
+ponderada por tamaño para resumir, la homología persistente (H0, H1 y su
+persistencia máxima) y su medoide o «forma central».
 
 Se muestran separadas y sin agregar, como exige el marco. Y se señala cuando una
 lectura no separa nada: fundamental, inversión y movimiento del bajo dejan los

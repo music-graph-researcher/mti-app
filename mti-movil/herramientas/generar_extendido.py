@@ -19,7 +19,6 @@ Uso, desde la raíz del proyecto MTI:
 from __future__ import annotations
 
 import argparse
-import collections
 import json
 import sys
 from pathlib import Path
@@ -36,31 +35,52 @@ def _matriz(matriz: Any) -> list[list[float | None]]:
     return [[_valor(c) for c in fila] for fila in (matriz or [])]
 
 
-def _pureza(familias: list[dict[str, Any]], etiquetas: dict[str, str]) -> float | None:
-    """Media de la pureza de cada familia respecto de la etiqueta publicitaria.
+def _pureza_ponderada(familias: list[dict[str, Any]]) -> float | None:
+    """Pureza del conjunto, ponderada por el tamaño de cada familia.
 
-    La etiqueta no interviene en ninguna distancia: se mide después, para
-    preguntar si la estructura reproduce el reparto por sectores.
+    El proyecto define la pureza **por familia** (`family["purity"]`): la
+    fracción de sus miembros que comparte el sector dominante. Para resumir una
+    lectura en una cifra hay que ponderar por tamaño; la media simple engaña,
+    porque una familia de un solo miembro es pura al 100 % por definición y con
+    dos o tres de esas la media se dispara sin que la estructura separe nada.
     """
 
-    valores = []
-    for familia in familias:
-        cuenta = collections.Counter(
-            etiquetas.get(miembro) for miembro in familia.get("members", [])
-        )
-        if cuenta:
-            valores.append(max(cuenta.values()) / sum(cuenta.values()))
-    return sum(valores) / len(valores) if valores else None
+    total = sum(f.get("size") or len(f.get("members", [])) for f in familias)
+    if not total:
+        return None
+    return sum(
+        (f.get("purity") or 0) * (f.get("size") or len(f.get("members", [])))
+        for f in familias
+    ) / total
 
 
-def _rasgos(persistencia: Any, grado: str) -> int:
-    bloque = (persistencia or {}).get(grado)
-    if isinstance(bloque, dict):
-        return len(bloque.get("features", []))
-    return len(bloque or [])
+def _rasgos(persistencia: Any) -> dict[str, Any]:
+    """Lo que el proyecto devuelve de la homología persistente, tal cual.
+
+    Las claves son `H0_intervals`, `H1_positive_intervals`, `H1_max_persistence`
+    y `H1_mean_persistence`. Una versión anterior de este guion buscaba `H0` y
+    `H1`, no las encontraba y daba cero en todas las lecturas: la app afirmaba
+    que la homología salía vacía, y era falso.
+    """
+
+    per = persistencia or {}
+    maximo = per.get("H1_max_persistence") or {}
+    medio = per.get("H1_mean_persistence") or {}
+
+    def cuenta(valor: Any) -> int:
+        # El proyecto devuelve recuentos; si algún día devolviera las listas de
+        # intervalos, esto sigue valiendo.
+        return len(valor) if isinstance(valor, (list, tuple)) else int(valor or 0)
+
+    return {
+        "H0": cuenta(per.get("H0_intervals")),
+        "H1": cuenta(per.get("H1_positive_intervals")),
+        "H1_max": maximo.get("decimal", maximo.get("value")),
+        "H1_media": medio.get("decimal", medio.get("value")),
+    }
 
 
-def _lectura(cruda: dict[str, Any], etiquetas: dict[str, str], medoides: dict[str, Any]) -> dict[str, Any]:
+def _lectura(cruda: dict[str, Any], medoides: dict[str, Any]) -> dict[str, Any]:
     familias = cruda.get("families") or []
     medoide = medoides.get(cruda["id"]) or {}
     return {
@@ -68,11 +88,18 @@ def _lectura(cruda: dict[str, Any], etiquetas: dict[str, str], medoides: dict[st
         "tipo": cruda.get("kind"),
         "silueta": cruda.get("silhouette"),
         "familias": [
-            {"id": f.get("id"), "miembros": f.get("members", [])} for f in familias
+            {
+                "id": f.get("id"),
+                "miembros": f.get("members", []),
+                "tamano": f.get("size") or len(f.get("members", [])),
+                "dominante": f.get("dominant_advertising_type"),
+                "pureza": f.get("purity"),
+                "sectores": f.get("advertising_types") or {},
+            }
+            for f in familias
         ],
-        "pureza": _pureza(familias, etiquetas),
-        "H0": _rasgos(cruda.get("persistence"), "H0"),
-        "H1": _rasgos(cruda.get("persistence"), "H1"),
+        "pureza_ponderada": _pureza_ponderada(familias),
+        "persistencia": _rasgos(cruda.get("persistence")),
         "medoide": {"id": medoide.get("medoid"), "obra": medoide.get("work"),
                     "compositor": medoide.get("composer")},
         "matriz": _matriz(cruda.get("distance_matrix")),
@@ -101,7 +128,7 @@ def generar(proyecto: Path, salida: Path) -> None:
                 "ids": [r["id"] for r in grupo],
                 "obras": {r["id"]: (r.get("metadata") or {}).get("work") for r in grupo},
                 "sectores": etiquetas,
-                "lecturas": [_lectura(l, etiquetas, medoides) for l in crudo.get("readings", [])],
+                "lecturas": [_lectura(l, medoides) for l in crudo.get("readings", [])],
             }
         )
 
